@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, path::PathBuf};
 
 use snafu::Snafu;
 
@@ -103,4 +103,24 @@ pub enum Error {
         #[snafu(source(from(kube::Error, Box::new)))]
         source: Box<kube::Error>,
     },
+
+    #[snafu(display("Failed to read the local SSH private key file {}, error: {source}", file_path.display()))]
+    ReadSshPrivateKey { file_path: PathBuf, source: std::io::Error },
+
+    #[snafu(display("Failed to parse private key: {source}"))]
+    ParseSshPrivateKey { source: ssh_key::Error },
+
+    #[snafu(display("Failed to serialize public key: {source}"))]
+    SerializeSshPublicKey { source: ssh_key::Error },
+
+    #[snafu(display("Failed to upload or authorize the SSH key in the pod {pod_name}: {source}"))]
+    UploadSshKey {
+        namespace: String,
+        pod_name: String,
+        #[snafu(source(from(kube::Error, Box::new)))]
+        source: Box<kube::Error>,
+    },
+
+    #[snafu(display("No SSH private key is provided"))]
+    NoSshPrivateKeyProvided,
 }

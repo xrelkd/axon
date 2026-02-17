@@ -52,6 +52,7 @@ resolve-path  = "0.1"
 semver        = "1"
 shadow-rs     = "1.7"
 snafu         = "0.8"
+ssh-key       = "0.6"
 
 axon-base = { path = "./crates/base" }
 axon-cli  = { path = "./crates/cli" }

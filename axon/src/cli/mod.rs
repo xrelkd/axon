@@ -4,6 +4,7 @@ mod delete;
 mod image;
 mod list;
 mod port_forward;
+mod ssh;
 
 use std::{io::Write, path::PathBuf};
 
@@ -14,7 +15,7 @@ use tokio::runtime::Runtime;
 
 use self::{
     attach::AttachCommand, create::CreateCommand, delete::DeleteCommand, image::ImageCommands,
-    list::ListCommand, port_forward::PortForwardCommand,
+    list::ListCommand, port_forward::PortForwardCommand, ssh::SshCommands,
 };
 use crate::{
     config::Config,
@@ -78,10 +79,16 @@ pub enum Commands {
     #[command(alias = "p", about = "Forward one or more local ports to a pod")]
     PortForward(PortForwardCommand),
 
-    #[command(alias = "i", about = "List all images")]
+    #[command(alias = "i", about = "Manage images")]
     Image {
         #[command(subcommand)]
         commands: ImageCommands,
+    },
+
+    #[command(about = "Support SSH")]
+    Ssh {
+        #[command(subcommand)]
+        commands: SshCommands,
     },
 }
 
@@ -161,6 +168,7 @@ impl Cli {
                 Some(Commands::Attach(cmd)) => cmd.run(kube_client, config).await?,
                 Some(Commands::PortForward(cmd)) => cmd.run(kube_client, config).await?,
                 Some(Commands::Image { commands }) => commands.run(config).await?,
+                Some(Commands::Ssh { commands }) => commands.run(kube_client, config).await?,
                 _ => {
                     let help = Self::command().render_long_help().ansi().to_string();
                     std::io::stderr()

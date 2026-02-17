@@ -22,6 +22,8 @@ pub struct Config {
     #[serde(default = "default_spec")]
     pub default_spec: String,
 
+    pub ssh_private_key_file_path: Option<PathBuf>,
+
     #[serde(default = "Vec::new")]
     pub specs: Vec<Spec>,
 
@@ -34,6 +36,7 @@ impl Default for Config {
         Self {
             default_pod_name: default_pod_name(),
             default_spec: default_spec(),
+            ssh_private_key_file_path: None,
             specs: vec![Spec::spec_malm(), Spec::default()],
             log: axon_cli::config::LogConfig::default(),
         }

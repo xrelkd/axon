@@ -37,6 +37,7 @@ directories   = { workspace = true }
 resolve-path  = { workspace = true }
 shadow-rs     = { workspace = true }
 snafu         = { workspace = true }
+ssh-key       = { workspace = true }
 
 axon-base = { workspace = true }
 axon-cli  = { workspace = true }
