@@ -1,0 +1,25 @@
+[package]
+name                   = "axon-base"
+description            = "Axon"
+version.workspace      = true
+authors.workspace      = true
+homepage.workspace     = true
+readme.workspace       = true
+repository.workspace   = true
+license.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+categories.workspace   = true
+keywords.workspace     = true
+
+[dependencies]
+serde = { workspace = true }
+
+tokio = { workspace = true }
+
+directories = { workspace = true }
+semver      = { workspace = true }
+snafu       = { workspace = true }
+
+[lints]
+workspace = true
