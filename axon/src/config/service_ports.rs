@@ -15,7 +15,7 @@ pub struct ServicePorts {
 
 impl ServicePorts {
     #[allow(dead_code)]
-    pub fn common() -> Self { Self { ssh: Some(22), http: Some(80), https: Some(443) } }
+    pub const fn common() -> Self { Self { ssh: Some(22), http: Some(80), https: Some(443) } }
 
     /// Aggregates multiple annotations into a single ServicePorts struct
     /// from any iterator of key-value pairs.
@@ -26,14 +26,14 @@ impl ServicePorts {
         V: fmt::Display,
     {
         iter.into_iter().fold(Self::default(), |mut acc, (k, v)| {
-            acc.merge(Self::from_kubernetes_annotation(k, v));
+            acc.merge(&Self::from_kubernetes_annotation(k, v));
             acc
         })
     }
 
-    /// Helper to merge another ServicePorts struct into this one,
+    /// Helper to merge another `ServicePorts` struct into this one,
     /// overwriting existing values if the other has Some.
-    fn merge(&mut self, other: Self) {
+    const fn merge(&mut self, other: &Self) {
         if let Some(p) = other.ssh {
             self.ssh = Some(p);
         }

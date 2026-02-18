@@ -11,7 +11,7 @@ use snafu::{OptionExt, ResultExt};
 
 use crate::{
     cli::attach::AttachCommand,
-    config::{Config, ImagePullPolicy, PortMapping, Spec},
+    config::{Config, ImagePullPolicy, PortMapping, ServicePorts, Spec},
     error::{self, Error},
 };
 
@@ -66,7 +66,7 @@ impl CreateCommand {
                 image,
                 image_pull_policy,
                 port_mappings,
-                service_ports: Default::default(),
+                service_ports: ServicePorts::default(),
                 command,
                 args,
                 interactive_shell,

@@ -1,8 +1,10 @@
+mod error;
+
 use std::io::Write;
 
 use snafu::ResultExt;
 
-use crate::{error, error::Error};
+pub use self::error::Error;
 
 // Helper to ensure terminal is restored if the program exits
 pub struct TerminalRawModeGuard;

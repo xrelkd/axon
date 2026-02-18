@@ -105,7 +105,7 @@ impl ShellCommand {
                 };
             let _raw_mode_guard = match TerminalRawModeGuard::setup() {
                 Ok(guard) => guard,
-                Err(err) => return sigfinn::ExitStatus::Error(err),
+                Err(err) => return sigfinn::ExitStatus::Error(Error::from(err)),
             };
 
             // arguments are escaped manually since the SSH protocol doesn't support quoting

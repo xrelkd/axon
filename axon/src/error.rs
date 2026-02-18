@@ -9,6 +9,9 @@ pub enum Error {
     Ssh { source: crate::ssh::Error },
 
     #[snafu(display("{source}"))]
+    TerminalUi { source: crate::ui::terminal::Error },
+
+    #[snafu(display("{source}"))]
     LoadConfiguration { source: crate::config::Error },
 
     #[snafu(display("Spec {spec_name} is not found"))]
@@ -98,9 +101,6 @@ pub enum Error {
     #[snafu(display("Failed to create signal stream, error: {source}"))]
     CreateSignalStream { source: std::io::Error },
 
-    #[snafu(display("Failed to enable terminal raw mode, error: {source}"))]
-    EnableTerminalRawMode { source: std::io::Error },
-
     #[snafu(display("Failed to get terminal size writer"))]
     GetTerminalSizeWriter,
 
@@ -131,4 +131,8 @@ pub enum Error {
 
 impl From<crate::ssh::Error> for Error {
     fn from(source: crate::ssh::Error) -> Self { Self::Ssh { source } }
+}
+
+impl From<crate::ui::terminal::Error> for Error {
+    fn from(source: crate::ui::terminal::Error) -> Self { Self::TerminalUi { source } }
 }
