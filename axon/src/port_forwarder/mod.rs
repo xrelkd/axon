@@ -13,8 +13,7 @@ use futures::{
 };
 use k8s_openapi::api::core::v1::Pod;
 use kube::Api;
-use sigfinn::{ExitStatus, Handle};
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, task::JoinSet};
 
 pub use self::error::Error;
 
@@ -26,7 +25,7 @@ where
     pod_name: String,
     local_addr: SocketAddr,
     remote_port: u16,
-    handle: Handle<Error>,
+    handle: JoinSet<Result<(), Error>>,
     on_ready: Option<F>,
 }
 
@@ -35,7 +34,7 @@ pub struct PortForwarderBuilder<F> {
     pod_name: String,
     local_addr: Option<SocketAddr>,
     remote_port: u16,
-    handle: Handle<Error>,
+    handle: JoinSet<Result<(), Error>>,
     on_ready: Option<F>,
 }
 
@@ -43,17 +42,12 @@ impl<F> PortForwarderBuilder<F>
 where
     F: FnOnce(SocketAddr) + Send + 'static,
 {
-    pub fn new(
-        api: Api<Pod>,
-        pod_name: impl Into<String>,
-        remote_port: u16,
-        handle: Handle<Error>,
-    ) -> Self {
+    pub fn new(api: Api<Pod>, pod_name: impl Into<String>, remote_port: u16) -> Self {
         Self {
             api,
             pod_name: pod_name.into(),
             remote_port,
-            handle,
+            handle: JoinSet::new(),
             local_addr: None,
             on_ready: None,
         }
@@ -94,29 +88,17 @@ impl<F> PortForwarder<F>
 where
     F: FnOnce(SocketAddr) + Send + 'static,
 {
-    pub async fn run(self, shutdown_signal: impl Future<Output = ()> + Unpin) -> ExitStatus<Error> {
-        let Self { api, pod_name, local_addr, remote_port, handle, on_ready } = self;
+    pub async fn run(self, shutdown_signal: impl Future<Output = ()> + Unpin) -> Result<(), Error> {
+        let Self { api, pod_name, local_addr, remote_port, mut handle, on_ready } = self;
 
         // 1. Bind the local TCP Listener
-        let listener = match TcpListener::bind(&local_addr).await {
-            Ok(l) => l,
-            Err(source) => {
-                return ExitStatus::Error(Error::BindTcpSocket {
-                    socket_address: local_addr,
-                    source,
-                });
-            }
-        };
+        let listener = TcpListener::bind(&local_addr)
+            .await
+            .map_err(|source| Error::BindTcpSocket { socket_address: local_addr, source })?;
 
-        let actual_addr = match listener.local_addr() {
-            Ok(addr) => addr,
-            Err(source) => {
-                return ExitStatus::Error(Error::BindTcpSocket {
-                    socket_address: local_addr,
-                    source,
-                });
-            }
-        };
+        let actual_addr = listener
+            .local_addr()
+            .map_err(|source| Error::BindTcpSocket { socket_address: local_addr, source })?;
 
         tracing::info!("Forwarding from: {actual_addr} -> {pod_name}:{remote_port}");
 
@@ -129,62 +111,70 @@ where
 
         // 3. Main Accept Loop
         loop {
-            let maybe_connection = tokio::select! {
-                _ = shutdown_stream.next() => break,
-                connection = listener.accept() => connection,
-            };
+            tokio::select! {
+                // Handle global shutdown
+                _ = shutdown_stream.next() => {
+                    tracing::info!("Shutdown signal received, closing port forwarder");
+                    break;
+                }
 
-            match maybe_connection {
-                Err(source) => {
-                    return ExitStatus::Error(Error::AcceptTcpSocket {
+                // Accept new connections
+                connection = listener.accept() => {
+                    let (mut local_stream, peer) = connection.map_err(|source| Error::AcceptTcpSocket {
                         socket_address: actual_addr,
                         source,
-                    });
-                }
-                Ok((mut local_stream, peer)) => {
+                    })?;
+
                     let api = api.clone();
                     let pod_name = pod_name.clone();
                     let stream_id = format!("stream-{actual_addr}-{}", peer.port());
 
-                    // 4. Spawn the bidirectional bridge for each connection
-                    let _unused =
-                        handle.spawn(stream_id.clone(), move |conn_shutdown| async move {
-                            let pf_res = api
-                                .portforward(&pod_name, &[remote_port])
-                                .await
-                                .map(|mut pf| pf.take_stream(remote_port));
+                    // 4. Spawn the bidirectional bridge for each connection into the JoinSet
+                    handle.spawn(async move {
+                        let pf_res = api
+                            .portforward(&pod_name, &[remote_port])
+                            .await
+                            .map(|mut pf| pf.take_stream(remote_port));
 
-                            let mut pod_stream = match pf_res {
-                                Ok(Some(stream)) => stream,
-                                Ok(None) => return ExitStatus::Success,
-                                Err(source) => {
-                                    tracing::error!(
-                                        "Failed to initialize pod stream for {stream_id}"
-                                    );
-                                    return ExitStatus::Error(Error::CreatePodStream {
-                                        stream_id,
-                                        source: Box::new(source),
-                                    });
-                                }
-                            };
-
-                            tracing::info!("Creating connection [{actual_addr}->{remote_port}]");
-                            let copy_fut =
-                                tokio::io::copy_bidirectional(&mut local_stream, &mut pod_stream);
-                            tokio::pin!(copy_fut);
-
-                            match future::select(conn_shutdown, copy_fut).await {
-                                Either::Left(_) => tracing::info!("Closing stream due to shutdown"),
-                                Either::Right((Err(e), _)) => tracing::warn!("Stream error: {e}"),
-                                Either::Right((Ok(_), _)) => {}
+                        let mut pod_stream = match pf_res {
+                            Ok(Some(stream)) => stream,
+                            Ok(None) => return Ok(()),
+                            Err(source) => {
+                                tracing::error!("Failed to initialize pod stream for {stream_id}");
+                                return Err(Error::CreatePodStream {
+                                    stream_id,
+                                    source: Box::new(source),
+                                });
                             }
+                        };
 
-                            ExitStatus::Success
-                        });
+                        tracing::info!("Creating connection [{actual_addr}->{remote_port}]");
+
+                        // Copy data until finished or error
+                        match tokio::io::copy_bidirectional(&mut local_stream, &mut pod_stream).await {
+                            Ok((sent, received)) => {
+                                tracing::debug!("Connection closed: sent {sent}, received {received}");
+                                Ok(())
+                            }
+                            Err(e) => {
+                                tracing::warn!("Stream error: {e}");
+                                Ok(()) // We don't necessarily want to kill the whole forwarder on one stream error
+                            }
+                        }
+                    });
+                }
+
+                // Clean up finished tasks from the JoinSet to prevent memory leaks
+                Some(result) = handle.join_next() => {
+                    if let Ok(Err(e)) = result {
+                        tracing::error!("Connection task failed: {e}");
+                    }
                 }
             }
         }
 
-        ExitStatus::Success
+        // Optional: Wait for remaining connections to finish or abort them
+        handle.shutdown().await;
+        Ok(())
     }
 }

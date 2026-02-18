@@ -52,4 +52,4 @@ k8s-openapi = { workspace = true }
 shadow-rs = { workspace = true }
 
 [lints]
-workspace = true
+# workspace = true
