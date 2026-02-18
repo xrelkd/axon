@@ -26,14 +26,17 @@ pub trait ApiPodExt {
         timeout: Duration,
     ) -> Result<Option<Pod>, Error>;
 
-    async fn port_forward(
+    async fn port_forward<R>(
         &self,
         pod_name: &str,
         local_socket_address: SocketAddr,
         remote_port: u16,
         handle: sigfinn::Handle<Error>,
         shutdown_signal: impl Future<Output = ()> + Unpin,
-    ) -> ExitStatus<Error>;
+        on_ready: R,
+    ) -> ExitStatus<Error>
+    where
+        R: FnOnce(SocketAddr) -> ();
 }
 
 impl ApiPodExt for Api<Pod> {
@@ -69,14 +72,18 @@ impl ApiPodExt for Api<Pod> {
             })
     }
 
-    async fn port_forward(
+    async fn port_forward<R>(
         &self,
         pod_name: &str,
         local_socket_address: SocketAddr,
         remote_port: u16,
         handle: sigfinn::Handle<Error>,
         shutdown_signal: impl Future<Output = ()> + Unpin,
-    ) -> ExitStatus<Error> {
+        on_ready: R,
+    ) -> ExitStatus<Error>
+    where
+        R: FnOnce(SocketAddr) -> (),
+    {
         let listener = match TcpListener::bind(&local_socket_address).await {
             Ok(listener) => listener,
             Err(source) => {
@@ -86,8 +93,18 @@ impl ApiPodExt for Api<Pod> {
                 });
             }
         };
+        let local_socket_address = match listener.local_addr() {
+            Ok(addr) => addr,
+            Err(source) => {
+                return ExitStatus::Error(Error::BindTcpSocket {
+                    socket_address: local_socket_address,
+                    source,
+                });
+            }
+        };
 
         tracing::info!("Forwarding from: {local_socket_address} -> {pod_name}:{remote_port}");
+        on_ready(local_socket_address);
 
         let mut shutdown_signal = shutdown_signal.into_stream();
         loop {

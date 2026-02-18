@@ -2,6 +2,7 @@ mod cli;
 mod config;
 mod error;
 mod ext;
+mod ssh;
 mod ui;
 mod shadow {
     #![allow(clippy::needless_raw_string_hashes)]

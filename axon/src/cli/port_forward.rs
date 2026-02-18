@@ -70,6 +70,7 @@ impl PortForwardCommand {
                     remote_port,
                     handle,
                     shutdown_signal,
+                    |_| {},
                 )
                 .await
             };

@@ -1,4 +1,4 @@
-use std::{io::Write, time::Duration};
+use std::time::Duration;
 
 use clap::Args;
 use futures::{SinkExt, channel::mpsc::Sender};
@@ -10,7 +10,12 @@ use kube::{
 use snafu::{OptionExt, ResultExt};
 use tokio::signal;
 
-use crate::{config::Config, error, error::Error, ext::ApiPodExt};
+use crate::{
+    config::Config,
+    error::{self, Error},
+    ext::ApiPodExt,
+    ui::terminal::TerminalRawModeGuard,
+};
 
 #[derive(Args, Clone)]
 pub struct AttachCommand {
@@ -53,7 +58,7 @@ impl AttachCommand {
         };
 
         // Ensure we disable raw mode even if the app panics
-        let _raw_mode_guard = RawModeGuard::setup()?;
+        let _raw_mode_guard = TerminalRawModeGuard::setup()?;
 
         // Attach into Pod
         let mut attached = pods
@@ -114,26 +119,6 @@ impl AttachCommand {
         let _unused = attached.join().await;
 
         Ok(())
-    }
-}
-
-// Helper to ensure terminal is restored if the program exits
-struct RawModeGuard;
-
-impl RawModeGuard {
-    fn setup() -> Result<Self, Error> {
-        crossterm::terminal::enable_raw_mode().context(error::EnableTerminalRawModeSnafu)?;
-        Ok(Self)
-    }
-}
-
-impl Drop for RawModeGuard {
-    fn drop(&mut self) {
-        let _ = std::io::stdout().flush().ok();
-        let _unused = crossterm::terminal::disable_raw_mode();
-        let mut stdout = std::io::stdout().lock();
-        let _ = stdout.write_all(b"\r").ok();
-        let _ = stdout.flush().ok();
     }
 }
 

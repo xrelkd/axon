@@ -48,7 +48,7 @@ impl DeleteCommand {
                     tracing::info!("pod/{pod_name} does not exist in namespace {namespace}");
                 }
 
-                Ok(())
+                Ok::<(), Error>(())
             }
         });
         let _unused =

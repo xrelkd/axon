@@ -1,14 +1,11 @@
-use std::{
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{path::PathBuf, time::Duration};
 
 use clap::Args;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{Api, api::AttachParams};
 use snafu::ResultExt;
 
-use crate::{config::Config, error, error::Error, ext::ApiPodExt};
+use crate::{config::Config, error, error::Error, ext::ApiPodExt, ssh};
 
 #[derive(Args, Clone)]
 pub struct SetupCommand {
@@ -39,7 +36,7 @@ impl SetupCommand {
             else {
                 return error::NoSshPrivateKeyProvidedSnafu.fail();
             };
-            derive_ssh_pubkey(&ssh_private_key_file).await?
+            ssh::load_public_key_from_secret_key_file(&ssh_private_key_file, None).await?
         };
 
         let namespace = namespace
@@ -78,30 +75,4 @@ impl SetupCommand {
 
         Ok(())
     }
-}
-
-async fn derive_ssh_pubkey<P>(ssh_private_key_file: P) -> Result<String, Error>
-where
-    P: AsRef<Path>,
-{
-    // 1. Read the private key file asynchronously
-    let private_key_content = tokio::fs::read_to_string(ssh_private_key_file.as_ref())
-        .await
-        .with_context(|_| error::ReadSshPrivateKeySnafu {
-            file_path: ssh_private_key_file.as_ref().to_path_buf(),
-        })?
-        .trim()
-        .to_string();
-
-    // 2. Parse the private key (supports OpenSSH, PKCS#8, etc.)
-    // Note: If the key is encrypted, this will require a passphrase.
-    let mut private_key = ssh_key::PrivateKey::from_openssh(&private_key_content)
-        .context(error::ParseSshPrivateKeySnafu)?;
-    private_key.set_comment("");
-
-    // 3. Extract the public key and format it as OpenSSH (e.g., "ssh-rsa AAA...")
-    let public_key = private_key.public_key();
-    let openssh_pub = public_key.to_openssh().context(error::SerializeSshPublicKeySnafu)?;
-
-    Ok(openssh_pub)
 }
