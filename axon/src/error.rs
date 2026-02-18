@@ -12,7 +12,7 @@ pub enum Error {
     TerminalUi { source: crate::ui::terminal::Error },
 
     #[snafu(display("{source}"))]
-    LoadConfiguration { source: crate::config::Error },
+    Configuration { source: crate::config::Error },
 
     #[snafu(display("Spec {spec_name} is not found"))]
     SpecNotFound { spec_name: String },
@@ -135,4 +135,8 @@ impl From<crate::ssh::Error> for Error {
 
 impl From<crate::ui::terminal::Error> for Error {
     fn from(source: crate::ui::terminal::Error) -> Self { Self::TerminalUi { source } }
+}
+
+impl From<crate::config::Error> for Error {
+    fn from(source: crate::config::Error) -> Self { Self::Configuration { source } }
 }

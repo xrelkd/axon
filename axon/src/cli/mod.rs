@@ -99,8 +99,7 @@ impl Default for Cli {
 impl Cli {
     fn load_config(&self) -> Result<Config, Error> {
         let mut config =
-            Config::load(self.config_file.clone().unwrap_or_else(Config::search_config_file_path))
-                .context(error::LoadConfigurationSnafu)?;
+            Config::load(self.config_file.clone().unwrap_or_else(Config::search_config_file_path))?;
 
         if let Some(log_level) = self.log_level {
             config.log.level = log_level;
