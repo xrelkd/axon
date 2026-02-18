@@ -1,21 +1,28 @@
-#![allow(dead_code)]
-
 mod error;
 
 use std::{
     future::Future,
     net::{IpAddr, Ipv4Addr, SocketAddr},
+    time::Duration,
 };
 
-use futures::{
-    FutureExt, StreamExt,
-    future::{self, Either},
-};
 use k8s_openapi::api::core::v1::Pod;
 use kube::Api;
-use tokio::{net::TcpListener, task::JoinSet};
+use tokio::{
+    net::{TcpListener, TcpStream},
+    sync::mpsc,
+    task::JoinSet,
+};
+use tokio_util::sync::CancellationToken;
 
 pub use self::error::Error;
+
+/// Internal events that drive the Forwarder loop
+enum Event {
+    Shutdown,
+    NewConnection { stream: TcpStream, peer: SocketAddr },
+    ReapConnections,
+}
 
 pub struct PortForwarder<F>
 where
@@ -25,7 +32,7 @@ where
     pod_name: String,
     local_addr: SocketAddr,
     remote_port: u16,
-    handle: JoinSet<Result<(), Error>>,
+    join_set: JoinSet<Result<(), Error>>,
     on_ready: Option<F>,
 }
 
@@ -34,7 +41,6 @@ pub struct PortForwarderBuilder<F> {
     pod_name: String,
     local_addr: Option<SocketAddr>,
     remote_port: u16,
-    handle: JoinSet<Result<(), Error>>,
     on_ready: Option<F>,
 }
 
@@ -43,14 +49,7 @@ where
     F: FnOnce(SocketAddr) + Send + 'static,
 {
     pub fn new(api: Api<Pod>, pod_name: impl Into<String>, remote_port: u16) -> Self {
-        Self {
-            api,
-            pod_name: pod_name.into(),
-            remote_port,
-            handle: JoinSet::new(),
-            local_addr: None,
-            on_ready: None,
-        }
+        Self { api, pod_name: pod_name.into(), remote_port, local_addr: None, on_ready: None }
     }
 
     pub fn local_address(mut self, addr: SocketAddr) -> Self {
@@ -64,7 +63,6 @@ where
             pod_name: self.pod_name,
             local_addr: self.local_addr,
             remote_port: self.remote_port,
-            handle: self.handle,
             on_ready: Some(callback),
         }
     }
@@ -78,7 +76,7 @@ where
             pod_name: self.pod_name,
             local_addr,
             remote_port: self.remote_port,
-            handle: self.handle,
+            join_set: JoinSet::new(),
             on_ready: self.on_ready,
         }
     }
@@ -88,10 +86,12 @@ impl<F> PortForwarder<F>
 where
     F: FnOnce(SocketAddr) + Send + 'static,
 {
-    pub async fn run(self, shutdown_signal: impl Future<Output = ()> + Unpin) -> Result<(), Error> {
-        let Self { api, pod_name, local_addr, remote_port, mut handle, on_ready } = self;
+    pub async fn run(
+        self,
+        shutdown_signal: impl Future<Output = ()> + Send + Unpin + 'static,
+    ) -> Result<(), Error> {
+        let Self { api, pod_name, local_addr, remote_port, mut join_set, on_ready } = self;
 
-        // 1. Bind the local TCP Listener
         let listener = TcpListener::bind(&local_addr)
             .await
             .map_err(|source| Error::BindTcpSocket { socket_address: local_addr, source })?;
@@ -102,45 +102,100 @@ where
 
         tracing::info!("Forwarding from: {actual_addr} -> {pod_name}:{remote_port}");
 
-        // 2. Trigger the readiness callback
         if let Some(on_ready) = on_ready {
             on_ready(actual_addr);
         }
 
-        let mut shutdown_stream = shutdown_signal.into_stream();
+        // --- Orchestration Tools ---
+        let (event_sender, mut event_receiver) = mpsc::channel::<Event>(32);
+        let cancel_token = CancellationToken::new();
 
-        // 3. Main Accept Loop
-        loop {
+        // 1. Shutdown Watcher Task
+        // Listens for the external signal and triggers the internal cancellation
+        let tx_shutdown = event_sender.clone();
+        let token_shutdown = cancel_token.clone();
+        join_set.spawn(async move {
             tokio::select! {
-                // Handle global shutdown
-                _ = shutdown_stream.next() => {
-                    tracing::info!("Shutdown signal received, closing port forwarder");
+                _ = shutdown_signal => {
+                    tracing::debug!("Shutdown signal received, notifying loop...");
+                    let _ = tx_shutdown.send(Event::Shutdown).await;
+                }
+                _ = token_shutdown.cancelled() => {
+                    tracing::debug!("Shutdown task cancelled internally.");
+                    let _ = tx_shutdown.send(Event::Shutdown).await;
+                }
+            }
+            Ok(())
+        });
+
+        // 2. Accept Task
+        let tx_accept = event_sender.clone();
+        let token_accept = cancel_token.clone();
+        join_set.spawn(async move {
+            loop {
+                let maybe_conn = tokio::select! {
+                    _ = token_accept.cancelled() => break,
+                    conn = listener.accept() => conn,
+                };
+
+                if let Ok((stream, peer)) = maybe_conn
+                    && tx_accept.send(Event::NewConnection { stream, peer }).await.is_err()
+                {
                     break;
                 }
+            }
+            tracing::debug!("Accept task exited.");
+            Ok(())
+        });
 
-                // Accept new connections
-                connection = listener.accept() => {
-                    let (mut local_stream, peer) = connection.map_err(|source| Error::AcceptTcpSocket {
-                        socket_address: actual_addr,
-                        source,
-                    })?;
+        // 3. Reap/Timer Task
+        let tx_reap = event_sender.clone();
+        let token_reap = cancel_token.clone();
+        join_set.spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(5));
+            loop {
+                tokio::select! {
+                    _ = token_reap.cancelled() => break,
+                    _ = interval.tick() => {}
+                }
+                if tx_reap.send(Event::ReapConnections).await.is_err() {
+                    break;
+                }
+            }
+            tracing::debug!("Reap task exited.");
+            Ok(())
+        });
 
+        while let Some(event) = event_receiver.recv().await {
+            match event {
+                Event::Shutdown => {
+                    tracing::info!("Initiating graceful shutdown...");
+                    cancel_token.cancel(); // Signal all background tasks to stop
+                    break;
+                }
+                Event::ReapConnections => {
+                    while let Some(result) = join_set.try_join_next() {
+                        if let Ok(Err(e)) = result {
+                            tracing::error!("Connection error during reap: {e}");
+                        }
+                    }
+                }
+                Event::NewConnection { mut stream, peer } => {
                     let api = api.clone();
                     let pod_name = pod_name.clone();
                     let stream_id = format!("stream-{actual_addr}-{}", peer.port());
+                    let token_conn = cancel_token.clone();
 
-                    // 4. Spawn the bidirectional bridge for each connection into the JoinSet
-                    handle.spawn(async move {
+                    join_set.spawn(async move {
                         let pf_res = api
                             .portforward(&pod_name, &[remote_port])
                             .await
                             .map(|mut pf| pf.take_stream(remote_port));
 
                         let mut pod_stream = match pf_res {
-                            Ok(Some(stream)) => stream,
+                            Ok(Some(s)) => s,
                             Ok(None) => return Ok(()),
                             Err(source) => {
-                                tracing::error!("Failed to initialize pod stream for {stream_id}");
                                 return Err(Error::CreatePodStream {
                                     stream_id,
                                     source: Box::new(source),
@@ -148,33 +203,36 @@ where
                             }
                         };
 
-                        tracing::info!("Creating connection [{actual_addr}->{remote_port}]");
+                        tracing::info!("Bridging connection for peer {peer}");
 
-                        // Copy data until finished or error
-                        match tokio::io::copy_bidirectional(&mut local_stream, &mut pod_stream).await {
-                            Ok((sent, received)) => {
-                                tracing::debug!("Connection closed: sent {sent}, received {received}");
-                                Ok(())
+                        // We use select here so individual connections also respect the global
+                        // shutdown
+                        tokio::select! {
+                            _ = token_conn.cancelled() => {
+                                tracing::debug!("Closing connection {} due to shutdown", peer);
                             }
-                            Err(e) => {
-                                tracing::warn!("Stream error: {e}");
-                                Ok(()) // We don't necessarily want to kill the whole forwarder on one stream error
-                            }
+                            _ = tokio::io::copy_bidirectional(&mut stream, &mut pod_stream) => {}
                         }
+                        Ok(())
                     });
-                }
-
-                // Clean up finished tasks from the JoinSet to prevent memory leaks
-                Some(result) = handle.join_next() => {
-                    if let Ok(Err(e)) = result {
-                        tracing::error!("Connection task failed: {e}");
-                    }
                 }
             }
         }
 
-        // Optional: Wait for remaining connections to finish or abort them
-        handle.shutdown().await;
+        // --- Cleanup Phase ---
+        // Explicitly drop the receiver so tasks sending events fail (if any are still
+        // alive)
+        drop(event_receiver);
+
+        tracing::info!("Waiting for all active connections to close...");
+        // This will wait for all tasks in the JoinSet to complete
+        while let Some(result) = join_set.join_next().await {
+            if let Ok(Err(e)) = result {
+                tracing::error!("Final cleanup connection error: {e}");
+            }
+        }
+
+        tracing::info!("Port forwarder exit complete.");
         Ok(())
     }
 }
