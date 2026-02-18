@@ -33,7 +33,7 @@ pub trait ApiPodExt {
         on_ready: R,
     ) -> ExitStatus<Error>
     where
-        R: FnOnce(SocketAddr) -> ();
+        R: FnOnce(SocketAddr);
 }
 
 impl ApiPodExt for Api<Pod> {
@@ -76,7 +76,7 @@ impl ApiPodExt for Api<Pod> {
         on_ready: R,
     ) -> ExitStatus<Error>
     where
-        R: FnOnce(SocketAddr) -> (),
+        R: FnOnce(SocketAddr),
     {
         let listener = match TcpListener::bind(&local_socket_address).await {
             Ok(listener) => listener,

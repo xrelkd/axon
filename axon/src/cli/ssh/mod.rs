@@ -1,5 +1,4 @@
 mod copy;
-mod execute;
 mod setup;
 mod shell;
 
@@ -10,10 +9,10 @@ use crate::{config::Config, error::Error};
 
 #[derive(Clone, Subcommand)]
 pub enum SshCommands {
-    #[command(about = "Setup SSH server")]
+    #[command(about = "Setup the SSH server in the container")]
     Setup(SetupCommand),
 
-    #[command(about = "Connect to SSH server and open a interactive shell")]
+    #[command(about = "Connect to the SSH server in the container and open a interactive shell")]
     Shell(ShellCommand),
 }
 
