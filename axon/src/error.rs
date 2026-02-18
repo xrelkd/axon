@@ -6,13 +6,16 @@ use snafu::Snafu;
 #[snafu(visibility(pub))]
 pub enum Error {
     #[snafu(display("{source}"))]
+    Configuration { source: crate::config::Error },
+
+    #[snafu(display("{source}"))]
     Ssh { source: crate::ssh::Error },
 
     #[snafu(display("{source}"))]
     TerminalUi { source: crate::ui::terminal::Error },
 
     #[snafu(display("{source}"))]
-    Configuration { source: crate::config::Error },
+    PortForwarder { source: crate::port_forwarder::Error },
 
     #[snafu(display("Spec {spec_name} is not found"))]
     SpecNotFound { spec_name: String },
@@ -104,12 +107,15 @@ pub enum Error {
     #[snafu(display("Failed to get terminal size writer"))]
     GetTerminalSizeWriter,
 
+    // FIXME: remove it
     #[snafu(display("Failed to bind TCP socket {socket_address}, error: {source}"))]
     BindTcpSocket { socket_address: SocketAddr, source: std::io::Error },
 
+    // FIXME: remove it
     #[snafu(display("Failed to accept TCP socket {socket_address}, error: {source}"))]
     AcceptTcpSocket { socket_address: SocketAddr, source: std::io::Error },
 
+    // FIXME: remove it
     #[snafu(display("Failed to create pod stream {stream_id}, error: {source}"))]
     CreatePodStream {
         stream_id: String,
@@ -129,6 +135,10 @@ pub enum Error {
     NoSshPrivateKeyProvided,
 }
 
+impl From<crate::config::Error> for Error {
+    fn from(source: crate::config::Error) -> Self { Self::Configuration { source } }
+}
+
 impl From<crate::ssh::Error> for Error {
     fn from(source: crate::ssh::Error) -> Self { Self::Ssh { source } }
 }
@@ -137,6 +147,6 @@ impl From<crate::ui::terminal::Error> for Error {
     fn from(source: crate::ui::terminal::Error) -> Self { Self::TerminalUi { source } }
 }
 
-impl From<crate::config::Error> for Error {
-    fn from(source: crate::config::Error) -> Self { Self::Configuration { source } }
+impl From<crate::port_forwarder::Error> for Error {
+    fn from(source: crate::port_forwarder::Error) -> Self { Self::PortForwarder { source } }
 }
