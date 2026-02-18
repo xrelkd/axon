@@ -85,7 +85,7 @@ pub enum Commands {
         commands: ImageCommands,
     },
 
-    #[command(about = "Support SSH")]
+    #[command(about = "Interact with a container via SSH")]
     Ssh {
         #[command(subcommand)]
         commands: SshCommands,

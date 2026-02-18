@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use clap::Args;
+use clap::{ArgAction, Args};
 use k8s_openapi::api::core::v1::Pod;
 use kube::Api;
 use sigfinn::LifecycleManager;
@@ -20,12 +20,12 @@ use crate::{
 const DEFAULT_SSH_PORT: u16 = 22;
 
 #[derive(Args, Clone)]
-pub struct ConnectCommand {
+pub struct ShellCommand {
     #[arg(short, long, help = "Namespace of the pod")]
-    pub namespace: Option<String>,
+    namespace: Option<String>,
 
     #[arg(short = 'p', long = "pod-name", help = "Name of the pod to attach to")]
-    pub pod_name: Option<String>,
+    pod_name: Option<String>,
 
     #[arg(
         short = 't',
@@ -33,18 +33,21 @@ pub struct ConnectCommand {
         default_value = "15",
         help = "The maximum time in seconds to wait before timing out"
     )]
-    pub timeout_secs: u64,
+    timeout_secs: u64,
 
     #[arg(short = 'i', long = "ssh-private-key-file", help = "File path of a SSH private key")]
-    pub ssh_private_key_file: Option<PathBuf>,
+    ssh_private_key_file: Option<PathBuf>,
 
     #[arg(short = 'u', long = "user", default_value = "root", help = "User name")]
-    pub user: String,
+    user: String,
+
+    #[arg(action = ArgAction::Append, default_value = "/bin/zsh", help = "Command")]
+    command: Vec<String>,
 }
 
-impl ConnectCommand {
+impl ShellCommand {
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
-        let Self { namespace, pod_name, timeout_secs, ssh_private_key_file, user } = self;
+        let Self { namespace, pod_name, timeout_secs, ssh_private_key_file, user, command } = self;
 
         let ssh_private_key = {
             let ((Some(ssh_private_key_file), _) | (None, Some(ssh_private_key_file))) =
@@ -66,8 +69,7 @@ impl ConnectCommand {
             .await_running_status(&pod_name, &namespace, Duration::from_secs(timeout_secs))
             .await?;
         let remote_port = pod.service_ports().ssh.unwrap_or(DEFAULT_SSH_PORT);
-        let remote_command = pod.interactive_shell();
-        // let remote_command = ["cat", "/etc/os-release"];
+        let remote_command = if command.is_empty() { pod.interactive_shell() } else { command };
 
         let lifecycle_manager = LifecycleManager::<Error>::new();
 
