@@ -12,10 +12,12 @@ use sigfinn::LifecycleManager;
 use crate::{
     config::Config,
     error::{self, Error},
-    ext::ApiPodExt,
+    ext::{ApiPodExt, PodExt},
     ssh,
     ui::terminal::TerminalRawModeGuard,
 };
+
+const DEFAULT_SSH_PORT: u16 = 22;
 
 #[derive(Args, Clone)]
 pub struct ConnectCommand {
@@ -35,11 +37,14 @@ pub struct ConnectCommand {
 
     #[arg(short = 'i', long = "ssh-private-key-file", help = "File path of a SSH private key")]
     pub ssh_private_key_file: Option<PathBuf>,
+
+    #[arg(short = 'u', long = "user", default_value = "root", help = "User name")]
+    pub user: String,
 }
 
 impl ConnectCommand {
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
-        let Self { namespace, pod_name, timeout_secs, ssh_private_key_file } = self;
+        let Self { namespace, pod_name, timeout_secs, ssh_private_key_file, user } = self;
 
         let ssh_private_key = {
             let ((Some(ssh_private_key_file), _) | (None, Some(ssh_private_key_file))) =
@@ -56,15 +61,13 @@ impl ConnectCommand {
         let pod_name =
             pod_name.filter(|s| !s.is_empty()).unwrap_or_else(|| config.default_pod_name.clone());
 
-        let pods = Api::<Pod>::namespaced(kube_client, &namespace);
-        let _unused = pods
+        let api = Api::<Pod>::namespaced(kube_client, &namespace);
+        let pod = api
             .await_running_status(&pod_name, &namespace, Duration::from_secs(timeout_secs))
             .await?;
-
-        let user = "root";
-        let remote_port = 22;
-
-        let remote_command = ["/bin/zsh"];
+        let remote_port = pod.service_ports().ssh.unwrap_or(DEFAULT_SSH_PORT);
+        let remote_command = pod.interactive_shell();
+        // let remote_command = ["cat", "/etc/os-release"];
 
         let lifecycle_manager = LifecycleManager::<Error>::new();
 
@@ -76,7 +79,7 @@ impl ConnectCommand {
             let on_ready = move |socket_addr| {
                 let _unused = ssh_local_socket_addr_sender.send(socket_addr);
             };
-            pods.port_forward(
+            api.port_forward(
                 &pod_name,
                 local_socket_addr,
                 remote_port,

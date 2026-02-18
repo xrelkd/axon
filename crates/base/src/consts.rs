@@ -16,6 +16,9 @@ pub mod k8s {
         pub static PORT_MAPPINGS_PREFIX: LazyLock<String> =
             LazyLock::new(|| format!("{PROJECT_NAME}.port-mappings"));
 
+        pub static SERVICE_PORT_PREFIX: LazyLock<String> =
+            LazyLock::new(|| format!("{PROJECT_NAME}.service-port"));
+
         pub static VERSION: LazyLock<String> = LazyLock::new(|| format!("{PROJECT_NAME}.version"));
     }
 }

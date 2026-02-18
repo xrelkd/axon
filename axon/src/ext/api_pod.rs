@@ -1,6 +1,5 @@
 use std::{net::SocketAddr, time::Duration};
 
-use axon_base::{consts, consts::k8s::annotations};
 use futures::{
     FutureExt, StreamExt,
     future::{self, Either},
@@ -14,17 +13,15 @@ use sigfinn::ExitStatus;
 use snafu::ResultExt;
 use tokio::net::TcpListener;
 
-use crate::{error, error::Error};
+use crate::error::{self, Error};
 
 pub trait ApiPodExt {
-    async fn interactive_shell(&self, pod_name: &str) -> Vec<String>;
-
     async fn await_running_status(
         &self,
         pod_name: &str,
         namespace: &str,
         timeout: Duration,
-    ) -> Result<Option<Pod>, Error>;
+    ) -> Result<Pod, Error>;
 
     async fn port_forward<R>(
         &self,
@@ -40,36 +37,33 @@ pub trait ApiPodExt {
 }
 
 impl ApiPodExt for Api<Pod> {
-    async fn interactive_shell(&self, pod_name: &str) -> Vec<String> {
-        if let Ok(pod) = self.get(pod_name).await
-            && let Some(annotations) = pod.metadata.annotations
-            && let Some(shell_json) = annotations.get(annotations::SHELL_INTERACTIVE.as_str())
-            && let Ok(shell) = serde_json::from_str::<Vec<String>>(shell_json)
-            && !shell.is_empty()
-        {
-            shell
-        } else {
-            consts::DEFAULT_INTERACTIVE_SHELL.iter().map(ToString::to_string).collect()
-        }
-    }
-
     async fn await_running_status(
         &self,
         pod_name: &str,
         namespace: &str,
         timeout: Duration,
-    ) -> Result<Option<Pod>, Error> {
+    ) -> Result<Pod, Error> {
         // Wait until the pod is running, otherwise we get 500 error.
-        tokio::time::timeout(timeout, await_condition(self.clone(), pod_name, is_pod_running()))
-            .await
-            .map_err(|_| Error::WaitForPodStatus {
+        let maybe_pod = tokio::time::timeout(
+            timeout,
+            await_condition(self.clone(), pod_name, is_pod_running()),
+        )
+        .await
+        .map_err(|_| Error::WaitForPodStatus {
+            namespace: namespace.to_string(),
+            pod_name: pod_name.to_string(),
+        })?
+        .with_context(|_| error::GetPodStatusSnafu {
+            namespace: namespace.to_string(),
+            pod_name: pod_name.to_string(),
+        })?;
+        match maybe_pod {
+            Some(pod) => Ok(pod),
+            None => self.get(pod_name).await.with_context(|_| error::GetPodSnafu {
                 namespace: namespace.to_string(),
                 pod_name: pod_name.to_string(),
-            })?
-            .with_context(|_| error::GetPodStatusSnafu {
-                namespace: namespace.to_string(),
-                pod_name: pod_name.to_string(),
-            })
+            }),
+        }
     }
 
     async fn port_forward<R>(

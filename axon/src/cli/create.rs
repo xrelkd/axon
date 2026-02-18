@@ -66,6 +66,7 @@ impl CreateCommand {
                 image,
                 image_pull_policy,
                 port_mappings,
+                service_ports: Default::default(),
                 command,
                 args,
                 interactive_shell,
@@ -105,6 +106,7 @@ impl CreateCommand {
                 ]
                 .into_iter()
                 .chain(port_mappings.iter().flatten().map(PortMapping::to_kubernetes_annotation))
+                .chain(target.service_ports.to_kubernetes_annotation())
                 .collect::<BTreeMap<_, _>>()
             };
 

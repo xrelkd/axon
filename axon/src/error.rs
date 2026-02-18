@@ -50,6 +50,16 @@ pub enum Error {
         source: Box<kube::Error>,
     },
 
+    #[snafu(display(
+        "Failed to get pod {pod_name} status in namespace {namespace}, error: {source}"
+    ))]
+    GetPod {
+        namespace: String,
+        pod_name: String,
+        #[snafu(source(from(kube::Error, Box::new)))]
+        source: Box<kube::Error>,
+    },
+
     #[snafu(display("Failed to wait for pod {pod_name} status in namespace {namespace}"))]
     WaitForPodStatus { namespace: String, pod_name: String },
 

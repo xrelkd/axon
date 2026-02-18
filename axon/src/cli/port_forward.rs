@@ -1,14 +1,14 @@
-use std::{collections::HashMap, net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 
 use clap::Args;
-use k8s_openapi::{Metadata, api::core::v1::Pod};
+use k8s_openapi::api::core::v1::Pod;
 use kube::Api;
 use sigfinn::LifecycleManager;
 
 use crate::{
     config::{Config, PortMapping},
     error::Error,
-    ext::ApiPodExt,
+    ext::{ApiPodExt, PodExt},
 };
 
 #[derive(Args, Clone)]
@@ -38,36 +38,29 @@ impl PortForwardCommand {
         let pod_name =
             pod_name.filter(|s| !s.is_empty()).unwrap_or_else(|| config.default_pod_name.clone());
 
-        let pods = Api::<Pod>::namespaced(kube_client, &namespace);
-
-        let port_map = pods
+        let api = Api::<Pod>::namespaced(kube_client, &namespace);
+        let port_mappings = api
             .await_running_status(&pod_name, &namespace, Duration::from_secs(timeout_secs))
             .await?
-            .map_or_else(HashMap::new, |pod| {
-                pod.metadata()
-                    .annotations
-                    .iter()
-                    .flatten()
-                    .filter_map(|(key, value)| {
-                        let PortMapping { container_port, local_port, address } =
-                            PortMapping::try_from_kubernetes_annotation(key, value).ok()?;
-                        Some((SocketAddr::new(address, local_port), container_port))
-                    })
-                    .collect()
-            });
+            .port_mappings();
+
+        if port_mappings.is_empty() {
+            return Ok(());
+        }
 
         let lifecycle_manager = LifecycleManager::<Error>::new();
 
-        for (local_socket_address, remote_port) in port_map {
-            let pods = pods.clone();
+        for PortMapping { container_port, local_port, address } in port_mappings {
+            let local_sock_addr = SocketAddr::new(address, local_port);
+            let api = api.clone();
             let pod_name = pod_name.clone();
             let handle = lifecycle_manager.handle();
-            let worker_name = format!("forwarder-{local_socket_address}/{pod_name}:{remote_port}");
+            let worker_name = format!("forwarder-{local_sock_addr}/{pod_name}:{container_port}");
             let create_fn = move |shutdown_signal| async move {
-                pods.port_forward(
+                api.port_forward(
                     &pod_name,
-                    local_socket_address,
-                    remote_port,
+                    local_sock_addr,
+                    container_port,
                     handle,
                     shutdown_signal,
                     |_| {},

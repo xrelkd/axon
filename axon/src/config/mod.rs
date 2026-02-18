@@ -1,5 +1,6 @@
 mod image_pull_policy;
 mod port_mapping;
+mod service_ports;
 
 use std::{
     net::{IpAddr, Ipv4Addr},
@@ -11,7 +12,9 @@ use resolve_path::PathResolveExt;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
-pub use self::{image_pull_policy::ImagePullPolicy, port_mapping::PortMapping};
+pub use self::{
+    image_pull_policy::ImagePullPolicy, port_mapping::PortMapping, service_ports::ServicePorts,
+};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -112,19 +115,22 @@ pub struct Spec {
     pub image: String,
 
     #[allow(clippy::struct_field_names)]
-    #[serde(default = "ImagePullPolicy::default")]
+    #[serde(default)]
     pub image_pull_policy: ImagePullPolicy,
 
-    #[serde(default = "Vec::new")]
+    #[serde(default)]
     pub port_mappings: Vec<PortMapping>,
 
-    #[serde(default = "Vec::new")]
+    #[serde(default)]
+    pub service_ports: ServicePorts,
+
+    #[serde(default)]
     pub command: Vec<String>,
 
-    #[serde(default = "Vec::new")]
+    #[serde(default)]
     pub args: Vec<String>,
 
-    #[serde(default = "Vec::new")]
+    #[serde(default)]
     pub interactive_shell: Vec<String>,
 }
 
@@ -146,6 +152,7 @@ impl Spec {
                     address: IpAddr::V4(Ipv4Addr::LOCALHOST),
                 },
             ],
+            service_ports: ServicePorts { ssh: Some(22), http: Some(8080), https: None },
             command: Vec::new(),
             args: Vec::new(),
             interactive_shell: vec!["/bin/zsh".to_string()],
@@ -160,13 +167,13 @@ impl Default for Spec {
             image: consts::DEFAULT_IMAGE.to_string(),
             image_pull_policy: ImagePullPolicy::default(),
             port_mappings: Vec::new(),
+            service_ports: ServicePorts::default(),
             command: vec!["sh".to_string()],
             args: vec!["-c".to_string(), "while true; do sleep 1; done".to_string()],
             interactive_shell: vec!["/bin/sh".to_string()],
         }
     }
 }
-
 fn default_pod_name() -> String { PROJECT_NAME.to_string() }
 
 fn default_spec() -> String { PROJECT_NAME.to_string() }

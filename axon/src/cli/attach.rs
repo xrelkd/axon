@@ -13,7 +13,7 @@ use tokio::signal;
 use crate::{
     config::Config,
     error::{self, Error},
-    ext::ApiPodExt,
+    ext::{ApiPodExt, PodExt},
     ui::terminal::TerminalRawModeGuard,
 };
 
@@ -46,22 +46,19 @@ impl AttachCommand {
         let pod_name =
             pod_name.filter(|s| !s.is_empty()).unwrap_or_else(|| config.default_pod_name.clone());
 
-        let pods = Api::<Pod>::namespaced(kube_client, &namespace);
-        let _unused = pods
+        let api = Api::<Pod>::namespaced(kube_client, &namespace);
+        let pod = api
             .await_running_status(&pod_name, &namespace, Duration::from_secs(timeout_secs))
             .await?;
 
-        let interactive_shell = if interactive_shell.is_empty() {
-            pods.interactive_shell(&pod_name).await
-        } else {
-            interactive_shell
-        };
+        let interactive_shell =
+            if interactive_shell.is_empty() { pod.interactive_shell() } else { interactive_shell };
 
         // Ensure we disable raw mode even if the app panics
         let _raw_mode_guard = TerminalRawModeGuard::setup()?;
 
         // Attach into Pod
-        let mut attached = pods
+        let mut attached = api
             .exec(
                 &pod_name,
                 interactive_shell,
