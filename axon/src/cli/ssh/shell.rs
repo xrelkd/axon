@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::Duration};
+use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 use clap::{ArgAction, Args};
 use k8s_openapi::api::core::v1::Pod;
@@ -6,7 +6,10 @@ use kube::Api;
 use sigfinn::{ExitStatus, LifecycleManager};
 
 use crate::{
-    cli::{Error, error},
+    cli::{
+        Error, error,
+        ssh::internal::{HandleGuard, SshConfigurator},
+    },
     config::Config,
     ext::{ApiPodExt, PodExt},
     port_forwarder::PortForwarderBuilder,
@@ -46,13 +49,19 @@ impl ShellCommand {
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
         let Self { namespace, pod_name, timeout_secs, ssh_private_key_file, user, command } = self;
 
-        let ssh_private_key = {
-            let ((Some(ssh_private_key_file), _) | (None, Some(ssh_private_key_file))) =
-                (ssh_private_key_file, config.ssh_private_key_file_path)
-            else {
-                return error::NoSshPrivateKeyProvidedSnafu.fail();
+        let (ssh_private_key, ssh_public_key) = {
+            let private_key = {
+                let ((Some(private_key_file), _) | (None, Some(private_key_file))) =
+                    (ssh_private_key_file, config.ssh_private_key_file_path)
+                else {
+                    return error::NoSshPrivateKeyProvidedSnafu.fail();
+                };
+                ssh::load_secret_key(private_key_file, None).await?
             };
-            ssh::load_secret_key(ssh_private_key_file, None).await?
+
+            let public_key =
+                private_key.public_key().to_openssh().expect("SSH public should be valid");
+            (private_key, public_key)
         };
 
         let namespace = namespace
@@ -67,6 +76,10 @@ impl ShellCommand {
             .await?;
         let remote_port = pod.service_ports().ssh.unwrap_or(DEFAULT_SSH_PORT);
         let remote_command = if command.is_empty() { pod.interactive_shell() } else { command };
+
+        SshConfigurator::new(api.clone(), &namespace, &pod_name)
+            .upload_ssh_key(ssh_public_key)
+            .await?;
 
         let lifecycle_manager = LifecycleManager::<Error>::new();
 
@@ -91,12 +104,22 @@ impl ShellCommand {
         };
 
         let _handle = lifecycle_manager.spawn("ssh-client", move |_| async move {
+            let socket_addr = match ssh_local_socket_addr_receiver.await {
+                Ok(a) => a,
+                Err(_err) => {
+                    let err =
+                        error::GenericSnafu { message: "SSH local socket address receiver failed" }
+                            .build();
+                    return ExitStatus::Error(err);
+                }
+            };
+
             let result = SshClientRunner {
                 handle,
-                addr_receiver: ssh_local_socket_addr_receiver,
+                socket_addr,
                 ssh_private_key,
                 user,
-                remote_command,
+                command: remote_command,
             }
             .run()
             .await;
@@ -117,29 +140,25 @@ impl ShellCommand {
 
 struct SshClientRunner {
     handle: sigfinn::Handle<Error>,
-    addr_receiver: tokio::sync::oneshot::Receiver<std::net::SocketAddr>,
+    socket_addr: SocketAddr,
     ssh_private_key: russh::keys::PrivateKey,
     user: String,
-    remote_command: Vec<String>,
+    command: Vec<String>,
 }
 
 impl SshClientRunner {
     async fn run(self) -> Result<(), Error> {
-        let Self { handle, addr_receiver, ssh_private_key, user, remote_command } = self;
+        let Self { handle, socket_addr, ssh_private_key, user, command } = self;
 
         // Automatically shuts down the port forwarder when this scope ends
         let _handle_guard = HandleGuard::from(handle);
 
-        let ssh_local_socket_addr = addr_receiver.await.map_err(|_| {
-            error::GenericSnafu { message: "SSH local socket address receiver failed" }.build()
-        })?;
-
-        let session = ssh::Session::connect(ssh_private_key, user, ssh_local_socket_addr).await?;
+        let session = ssh::Session::connect(ssh_private_key, user, socket_addr).await?;
 
         // Enter raw mode to handle TTY interactions correctly
         let _raw_mode_guard = TerminalRawModeGuard::setup()?;
 
-        let escaped_command = remote_command
+        let escaped_command = command
             .into_iter()
             .map(|x| shell_escape::escape(x.into()))
             .collect::<Vec<_>>()
@@ -154,16 +173,4 @@ impl SshClientRunner {
         call_result.map(|_| ()).map_err(Error::from)?;
         close_result.map_err(Error::from)
     }
-}
-
-struct HandleGuard {
-    handle: sigfinn::Handle<Error>,
-}
-
-impl From<sigfinn::Handle<Error>> for HandleGuard {
-    fn from(handle: sigfinn::Handle<Error>) -> Self { Self { handle } }
-}
-
-impl Drop for HandleGuard {
-    fn drop(&mut self) { self.handle.shutdown(); }
 }

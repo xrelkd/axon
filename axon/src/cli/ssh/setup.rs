@@ -2,11 +2,10 @@ use std::{path::PathBuf, time::Duration};
 
 use clap::Args;
 use k8s_openapi::api::core::v1::Pod;
-use kube::{Api, api::AttachParams};
-use snafu::ResultExt;
+use kube::Api;
 
 use crate::{
-    cli::{Error, error},
+    cli::{Error, error, ssh::internal::SshConfigurator},
     config::Config,
     ext::ApiPodExt,
     ssh,
@@ -50,34 +49,11 @@ impl SetupCommand {
         let pod_name =
             pod_name.filter(|s| !s.is_empty()).unwrap_or_else(|| config.default_pod_name.clone());
 
-        // We use a single shell command to:
-        // 1. Create .ssh directory
-        // 2. Append the key to authorized_keys
-        // 3. Set correct permissions (SSH is picky about 700/600)
-        let auth_command = [
-            "sh".to_string(),
-            "-c".to_string(),
-            [
-                "mkdir -p ~/.ssh",
-                "chmod 700 ~/.ssh",
-                &format!("echo '{ssh_public_key}' >> ~/.ssh/authorized_keys"),
-                "chmod 600 ~/.ssh/authorized_keys",
-            ]
-            .join(" && "),
-        ];
-
-        let pods = Api::<Pod>::namespaced(kube_client, &namespace);
-        let _unused = pods
+        let api = Api::<Pod>::namespaced(kube_client, &namespace);
+        let _unused = api
             .await_running_status(&pod_name, &namespace, Duration::from_secs(timeout_secs))
             .await?;
 
-        let attached = pods
-            .exec(&pod_name, auth_command, &AttachParams::default())
-            .await
-            .with_context(|_| error::UploadSshKeySnafu { namespace, pod_name })?;
-
-        let _unused = attached.join().await;
-
-        Ok(())
+        SshConfigurator::new(api, namespace, pod_name).upload_ssh_key(ssh_public_key).await
     }
 }

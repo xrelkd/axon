@@ -1,4 +1,5 @@
 mod copy;
+mod internal;
 mod setup;
 mod shell;
 
