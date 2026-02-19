@@ -14,17 +14,27 @@ use crate::{
 
 #[derive(Args, Clone)]
 pub struct PortForwardCommand {
-    #[arg(short, long, help = "Namespace of the pod")]
+    #[arg(
+        short,
+        long,
+        help = "Kubernetes namespace of the target pod. If not specified, the default namespace \
+                will be used."
+    )]
     pub namespace: Option<String>,
 
-    #[arg(short = 'p', long = "pod-name", help = "Name of the pod to attach to")]
+    #[arg(
+        short = 'p',
+        long = "pod-name",
+        help = "Name of the temporary pod to forward ports for. If not specified, Axon's default \
+                pod name will be used."
+    )]
     pub pod_name: Option<String>,
 
     #[arg(
         short = 't',
         long = "timeout-seconds",
         default_value = "15",
-        help = "The maximum time in seconds to wait before timing out"
+        help = "The maximum time in seconds to wait for the pod to be running before timing out."
     )]
     pub timeout_secs: u64,
 }

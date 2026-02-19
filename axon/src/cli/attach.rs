@@ -13,20 +13,35 @@ use crate::{
 
 #[derive(Args, Clone)]
 pub struct AttachCommand {
-    #[arg(short, long, help = "Namespace of the pod")]
+    #[arg(
+        short,
+        long,
+        help = "Kubernetes namespace of the target pod. If not specified, the default namespace \
+                will be used."
+    )]
     pub namespace: Option<String>,
 
-    #[arg(short = 'p', long = "pod-name", help = "Name of the pod to attach to")]
+    #[arg(
+        short = 'p',
+        long = "pod-name",
+        help = "Name of the temporary pod to attach to. If not specified, Axon's default pod name \
+                will be used."
+    )]
     pub pod_name: Option<String>,
 
-    #[arg(short = 's', long = "shell", help = "Interactive shell used to attach container")]
+    #[arg(
+        short = 's',
+        long = "shell",
+        help = "Command and arguments for the interactive shell to use (e.g., `/bin/bash`, `bash \
+                -c 'sh'`). If not specified, Axon will attempt to detect the shell."
+    )]
     pub interactive_shell: Vec<String>,
 
     #[arg(
         short = 't',
         long = "timeout-seconds",
         default_value = "15",
-        help = "The maximum time in seconds to wait before timing out"
+        help = "The maximum time in seconds to wait for the pod to be running before timing out."
     )]
     pub timeout_secs: u64,
 }

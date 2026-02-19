@@ -29,8 +29,8 @@ use crate::{config::Config, shadow};
     author,
     version,
     long_version = shadow::CLAP_LONG_VERSION,
-    about,
-    long_about = None,
+    about = "Axon CLI: A robust tool for advanced Kubernetes resource management.",
+    long_about = "Axon is a powerful Rust-based Command Line Interface (CLI) tool designed for advanced interaction with Kubernetes resources. It provides extended functionality and a specialized interface for common Kubernetes operational tasks, including pod management, image handling, and secure shell access.",
     color = clap::ColorChoice::Always
 )]
 #[command()]
@@ -42,59 +42,69 @@ pub struct Cli {
         long = "config",
         short = 'c',
         env = "AXON_CONFIG_FILE_PATH",
-        help = "Specify a configuration file"
+        help = "Specify a configuration file. Defaults to ~/.config/axon/config.yaml or \
+                AXON_CONFIG_FILE_PATH env var."
     )]
     config_file: Option<PathBuf>,
 
-    #[clap(long = "log-level", env = "AXON_LOG_LEVEL", help = "Specify a log level")]
+    #[clap(
+        long = "log-level",
+        env = "AXON_LOG_LEVEL",
+        help = "Set the logging level (e.g., info, debug, trace)."
+    )]
     log_level: Option<tracing::Level>,
 }
 
 #[derive(Clone, Subcommand)]
 pub enum Commands {
-    #[command(about = "Print the client and server version information")]
+    #[command(about = "Display client and server version information")]
     Version {
         #[clap(long = "client", help = "If true, shows client version only (no server required).")]
         client: bool,
     },
 
-    #[command(about = "Output shell completion code for the specified shell (bash, zsh, fish)")]
+    #[command(about = "Generate shell completion script for the specified shell (bash, zsh, fish)")]
     Completions { shell: clap_complete::Shell },
 
-    #[command(about = "Output default configuration")]
+    #[command(about = "Output the default configuration in YAML format")]
     DefaultConfig,
 
-    #[command(alias = "c", about = "Create new pod in a specified namespace")]
+    #[command(
+        alias = "c",
+        about = "Create a new temporary pod in a specified namespace or using a predefined spec"
+    )]
     Create(CreateCommand),
 
-    #[command(alias = "d", about = "Delete a pod in a specified namespace")]
+    #[command(alias = "d", about = "Delete one or more temporary pods managed by Axon")]
     Delete(DeleteCommand),
 
-    #[command(alias = "a", about = "Attach to a pod in a specific namespace")]
+    #[command(alias = "a", about = "Attach to a running temporary pod's console")]
     Attach(AttachCommand),
 
     #[command(
         aliases = ["e", "exec"],
-        about = "Execute command on a pod in a specific namespace"
+        about = "Execute a command inside a running temporary pod"
     )]
     Execute(ExecuteCommand),
 
-    #[command(alias = "l", about = "List all pods created by axon")]
+    #[command(alias = "l", about = "List all temporary pods managed by Axon")]
     List(ListCommand),
 
     #[command(
         aliases = ["p", "pf"],
-        about = "Forward one or more local ports to a pod"
+        about = "Forward one or more local ports to a specific port on a temporary pod"
     )]
     PortForward(PortForwardCommand),
 
-    #[command(alias = "i", about = "Manage images")]
+    #[command(alias = "i", about = "Manage container image specifications")]
     Image {
         #[command(subcommand)]
         commands: ImageCommands,
     },
 
-    #[command(about = "Interact with a container via SSH")]
+    #[command(
+        about = "Securely interact with a temporary pod via SSH (shell, file transfer, setup)"
+    )]
     Ssh {
         #[command(subcommand)]
         commands: SshCommands,

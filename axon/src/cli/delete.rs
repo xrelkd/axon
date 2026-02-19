@@ -15,7 +15,12 @@ use crate::{
 
 #[derive(Args, Clone)]
 pub struct DeleteCommand {
-    #[arg(short, long, help = "Namespace to search for the pod")]
+    #[arg(
+        short,
+        long,
+        help = "Kubernetes namespace where the temporary pods are located. Defaults to the \
+                current Kubernetes context's namespace."
+    )]
     pub namespace: Option<String>,
 
     #[arg(
@@ -23,7 +28,7 @@ pub struct DeleteCommand {
         long = "pod-names",
         action = ArgAction::Append,
         num_args = 1..,
-        help = "Pod names to delete"
+        help = "Names of the temporary pods to delete. If no names are provided, a fuzzy finder will be used to select pods managed by Axon."
     )]
     pub pod_names: Vec<String>,
 }

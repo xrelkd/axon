@@ -12,10 +12,19 @@ use crate::{
 
 #[derive(Args, Clone)]
 pub struct ListCommand {
-    #[arg(short, long, help = "Namespace, use current namespace if not provided")]
+    #[arg(
+        short,
+        long,
+        help = "Kubernetes namespace to list pods from. Defaults to the current Kubernetes \
+                context's namespace."
+    )]
     pub namespace: Option<String>,
 
-    #[arg(short, long, help = "List all pods created by axon in all namespaces")]
+    #[arg(
+        short,
+        long,
+        help = "List all temporary pods created by Axon across all Kubernetes namespaces."
+    )]
     pub all_namespaces: bool,
 }
 

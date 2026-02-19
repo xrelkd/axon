@@ -19,30 +19,50 @@ use crate::{
 
 #[derive(Args, Clone)]
 pub struct PutCommand {
-    #[arg(short, long, help = "Namespace of the pod")]
+    #[arg(
+        short,
+        long,
+        help = "Kubernetes namespace of the target pod. If not specified, the default namespace \
+                will be used."
+    )]
     namespace: Option<String>,
 
-    #[arg(short = 'p', long = "pod-name", help = "Name of the pod to attach to")]
+    #[arg(
+        short = 'p',
+        long = "pod-name",
+        help = "Name of the temporary pod to upload the file to. If not specified, Axon's default \
+                pod name will be used."
+    )]
     pod_name: Option<String>,
 
     #[arg(
         short = 't',
         long = "timeout-seconds",
         default_value = "15",
-        help = "The maximum time in seconds to wait before timing out"
+        help = "The maximum time in seconds to wait for the pod to be running before timing out."
     )]
     timeout_secs: u64,
 
-    #[arg(short = 'i', long = "ssh-private-key-file", help = "File path of a SSH private key")]
+    #[arg(
+        short = 'i',
+        long = "ssh-private-key-file",
+        help = "Path to the SSH private key file for authentication. If not specified, Axon will \
+                look for `ssh_private_key_file_path` in the configuration."
+    )]
     ssh_private_key_file: Option<PathBuf>,
 
-    #[arg(short = 'u', long = "user", default_value = "root", help = "User name")]
+    #[arg(
+        short = 'u',
+        long = "user",
+        default_value = "root",
+        help = "User name to connect as via SSH on the remote pod."
+    )]
     user: String,
 
-    #[arg(help = "Source file")]
+    #[arg(help = "Local path to the file to upload.")]
     source: PathBuf,
 
-    #[arg(help = "Destination file")]
+    #[arg(help = "Path on the remote pod where the file will be saved.")]
     destination: PathBuf,
 }
 

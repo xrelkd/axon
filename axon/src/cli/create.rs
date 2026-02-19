@@ -24,17 +24,24 @@ pub struct CreateCommand {
         short = 'n',
         long = "namespace",
         default_value = "",
-        help = "Namespace used to create a pod, use current namespace if not provided"
+        help = "Kubernetes namespace to create the pod in. Defaults to the current Kubernetes \
+                context's namespace."
     )]
     pub namespace: Option<String>,
 
-    #[arg(short = 'p', long = "pod-name", help = "Pod name")]
+    #[arg(
+        short = 'p',
+        long = "pod-name",
+        help = "Name for the new temporary pod. If not specified, Axon's default pod naming \
+                convention will be used."
+    )]
     pub pod_name: Option<String>,
 
     #[arg(
         short = 'a',
         long = "auto-attach",
-        help = "Attach to the pod automatically after creating"
+        help = "Automatically attach to the pod's console after it has been successfully created \
+                and is running."
     )]
     pub auto_attach: bool,
 
@@ -42,7 +49,8 @@ pub struct CreateCommand {
         short = 't',
         long = "timeout-seconds",
         default_value = "90",
-        help = "The maximum time in seconds to wait before timing out"
+        help = "The maximum time in seconds to wait for the pod to be created and running before \
+                timing out."
     )]
     pub timeout_secs: u64,
 
@@ -180,17 +188,25 @@ impl CreateCommand {
 pub enum Mode {
     Default,
     Preset {
-        #[arg(help = "Container spec name")]
+        #[arg(
+            help = "Name of the predefined image specification to use from the configuration file."
+        )]
         spec_name: String,
     },
     Manual {
-        #[arg(long = "image", default_value = "docker.io/alpine:3.23", help = "Container image")]
+        #[arg(
+            long = "image",
+            default_value = "docker.io/alpine:3.23",
+            help = "Container image to use for the pod (e.g., `ubuntu:latest`, \
+                    `myregistry/myimage:v1`)."
+        )]
         image: String,
 
         #[arg(
             long = "image-pull-policy",
             default_value = "IfNotPresent",
-            help = "Image pull policy"
+            help = "Policy for pulling the container image (e.g., `Always`, `IfNotPresent`, \
+                    `Never`)."
         )]
         image_pull_policy: ImagePullPolicy,
 
@@ -198,7 +214,7 @@ pub enum Mode {
             long = "command",
             action = ArgAction::Append,
             default_value = "sh",
-            help = "The command to execute on container"
+            help = "Command to execute as the container's entrypoint. Can be specified multiple times for multiple arguments."
         )]
         command: Vec<String>,
 
@@ -206,7 +222,7 @@ pub enum Mode {
             long = "args",
             action = ArgAction::Append,
             default_values_t = ["-c".to_string(), "while true; do sleep 1; done".to_string()],
-            help = "Arguments"
+            help = "Arguments to pass to the container's command. Can be specified multiple times."
         )]
         args: Vec<String>,
 
@@ -214,14 +230,14 @@ pub enum Mode {
             long = "shell",
             action = ArgAction::Append,
             default_value = "/bin/sh",
-            help = "Interactive shell"
+            help = "Interactive shell command and arguments to use when attaching to the container (e.g., `/bin/bash`, `bash -c 'sh'`)."
         )]
         interactive_shell: Vec<String>,
 
         #[arg(
             long = "ports",
             action = ArgAction::Append,
-            help = "Port mappings"
+            help = "Port mappings to forward from the local machine to the container (e.g., `8080:80/tcp`). Can be specified multiple times."
         )]
         port_mappings: Vec<PortMapping>,
     },

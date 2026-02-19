@@ -16,13 +16,13 @@ pub enum Error {
         source: Box<kube::Error>,
     },
 
-    #[snafu(display("Failed to initialize standard I/O streams ({stream}), error: {source}"))]
+    #[snafu(display("Failed to initialize standard I/O stream '{stream}', error: {source}"))]
     InitializeStdio { stream: Cow<'static, str>, source: std::io::Error },
 
-    #[snafu(display("Error occurs while copying I/O, error: {source}"))]
+    #[snafu(display("Failed to copy I/O, error: {source}"))]
     CopyIo { source: std::io::Error },
 
-    #[snafu(display("{stream} requested but missing"))]
+    #[snafu(display("Requested pod stream '{stream}' is missing"))]
     GetPodStream { stream: Cow<'static, str> },
 
     #[snafu(display("Failed to get terminal size, error: {source}"))]
@@ -34,7 +34,7 @@ pub enum Error {
     #[snafu(display("Failed to create signal stream, error: {source}"))]
     CreateSignalStream { source: std::io::Error },
 
-    #[snafu(display("Failed to get terminal size writer"))]
+    #[snafu(display("Failed to obtain terminal size writer"))]
     GetTerminalSizeWriter,
 }
 

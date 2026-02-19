@@ -11,16 +11,16 @@ use crate::{cli::Error, config::Config};
 
 #[derive(Clone, Subcommand)]
 pub enum SshCommands {
-    #[command(about = "Setup the SSH server in the container")]
+    #[command(about = "Set up and authorize SSH access on a temporary pod.")]
     Setup(SetupCommand),
 
-    #[command(about = "Connect to the SSH server in the container and open a interactive shell")]
+    #[command(about = "Open an interactive SSH shell into a temporary pod.")]
     Shell(ShellCommand),
 
-    #[command(about = "Get a file from container")]
+    #[command(about = "Download a file from a temporary pod via SSH.")]
     Get(GetCommand),
 
-    #[command(about = "Put a file to container")]
+    #[command(about = "Upload a file to a temporary pod via SSH.")]
     Put(PutCommand),
 }
 
