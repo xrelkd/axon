@@ -111,7 +111,7 @@ impl PutCommand {
             (handle, receiver)
         };
 
-        let _handle = lifecycle_manager.spawn("ssh-client", move |_| async move {
+        let _handle = lifecycle_manager.spawn("ssh-client", move |shutdown_signal| async move {
             let socket_addr = match ssh_local_socket_addr_receiver.await {
                 Ok(a) => a,
                 Err(_err) => {
@@ -129,7 +129,7 @@ impl PutCommand {
                 user,
                 transfer: Transfer::Upload { source, destination },
             }
-            .run()
+            .run(shutdown_signal)
             .await;
             match result {
                 Ok(()) => ExitStatus::Success,

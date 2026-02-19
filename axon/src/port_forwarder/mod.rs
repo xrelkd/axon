@@ -250,7 +250,6 @@ impl ConnectionHandler {
             Err(source) => return Err(error::CreatePodStreamSnafu { stream_id }.into_error(source)),
         };
 
-        //
         tracing::info!("Bridging connection: {peer} <-> {pod_name}:{remote_port}");
 
         tokio::select! {
