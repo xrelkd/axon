@@ -70,21 +70,12 @@ impl Session {
         let mut channel =
             self.session.channel_open_session().await.context(error::OpenChannelSnafu)?;
 
+        let term = std::env::var("TERM").unwrap_or_else(|_| "xterm".into());
         let (width, height) = crossterm::terminal::size().context(error::GetTerminalSizeSnafu)?;
-
         channel
-            .request_pty(
-                false,
-                &std::env::var("TERM").unwrap_or_else(|_| "xterm".into()),
-                u32::from(width),
-                u32::from(height),
-                0,
-                0,
-                &[],
-            )
+            .request_pty(false, &term, u32::from(width), u32::from(height), 0, 0, &[])
             .await
             .context(error::RequestPtySnafu)?;
-
         channel.exec(true, command).await.context(error::ExecuteCommandSnafu)?;
 
         let code;
