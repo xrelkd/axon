@@ -27,10 +27,10 @@ pub struct Config {
 
     pub ssh_private_key_file_path: Option<PathBuf>,
 
-    #[serde(default = "Vec::new")]
+    #[serde(default)]
     pub specs: Vec<Spec>,
 
-    #[serde(default = "axon_cli::config::LogConfig::default")]
+    #[serde(default)]
     pub log: axon_cli::config::LogConfig,
 }
 
