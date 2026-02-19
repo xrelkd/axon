@@ -69,7 +69,7 @@ impl GetCommand {
             };
 
             let public_key =
-                private_key.public_key().to_openssh().expect("SSH public should be valid");
+                private_key.public_key().to_openssh().expect("SSH public key should be valid");
             (private_key, public_key)
         };
 
