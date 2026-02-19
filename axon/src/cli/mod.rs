@@ -1,6 +1,7 @@
 mod attach;
 mod create;
 mod delete;
+pub mod error;
 mod execute;
 mod image;
 mod list;
@@ -14,15 +15,12 @@ use futures::FutureExt;
 use snafu::ResultExt;
 use tokio::runtime::Runtime;
 
+pub use self::error::Error;
 use self::{
     attach::AttachCommand, create::CreateCommand, delete::DeleteCommand, execute::ExecuteCommand,
     image::ImageCommands, list::ListCommand, port_forward::PortForwardCommand, ssh::SshCommands,
 };
-use crate::{
-    config::Config,
-    error::{self, Error},
-    shadow,
-};
+use crate::{config::Config, shadow};
 
 #[derive(Parser)]
 #[command(

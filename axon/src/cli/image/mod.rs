@@ -3,7 +3,7 @@ mod list;
 use clap::Subcommand;
 
 pub use self::list::ListCommand;
-use crate::{config::Config, error::Error};
+use crate::{cli::Error, config::Config};
 
 #[derive(Clone, Subcommand)]
 pub enum ImageCommands {

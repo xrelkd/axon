@@ -7,7 +7,7 @@ use kube::{
 };
 use snafu::ResultExt;
 
-use crate::error::{self, Error};
+use crate::cli::{Error, error};
 
 pub trait ApiPodExt {
     async fn await_running_status(

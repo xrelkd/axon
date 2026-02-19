@@ -5,7 +5,7 @@ mod shell;
 use clap::Subcommand;
 
 pub use self::{setup::SetupCommand, shell::ShellCommand};
-use crate::{config::Config, error::Error};
+use crate::{cli::Error, config::Config};
 
 #[derive(Clone, Subcommand)]
 pub enum SshCommands {

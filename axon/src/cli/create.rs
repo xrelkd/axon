@@ -10,9 +10,8 @@ use kube::{
 use snafu::{OptionExt, ResultExt};
 
 use crate::{
-    cli::attach::AttachCommand,
+    cli::{Error, attach::AttachCommand, error},
     config::{Config, ImagePullPolicy, PortMapping, ServicePorts, Spec},
-    error::{self, Error},
 };
 
 #[derive(Args, Clone)]

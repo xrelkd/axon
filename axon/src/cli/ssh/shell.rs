@@ -6,8 +6,8 @@ use kube::Api;
 use sigfinn::{ExitStatus, LifecycleManager};
 
 use crate::{
+    cli::{Error, error},
     config::Config,
-    error::{self, Error},
     ext::{ApiPodExt, PodExt},
     port_forwarder::PortForwarderBuilder,
     ssh,

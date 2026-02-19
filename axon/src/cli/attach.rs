@@ -5,8 +5,8 @@ use k8s_openapi::api::core::v1::Pod;
 use kube::Api;
 
 use crate::{
+    cli::Error,
     config::Config,
-    error::Error,
     ext::{ApiPodExt, PodExt},
     pod_console::PodConsole,
 };

@@ -3,8 +3,8 @@ use snafu::ResultExt;
 use tokio::io::AsyncWriteExt;
 
 use crate::{
+    cli::{Error, error},
     config::Config,
-    error::{self, Error},
     ui::table::ImageExt,
 };
 

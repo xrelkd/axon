@@ -4,7 +4,7 @@ use k8s_openapi::api::core::v1::Pod;
 use kube::{Api, api::DeleteParams};
 use snafu::ResultExt;
 
-use crate::{error, error::Error};
+use crate::cli::{error, error::Error};
 
 #[derive(Args, Clone)]
 pub struct DeleteCommand {

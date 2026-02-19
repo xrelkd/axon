@@ -5,7 +5,12 @@ use k8s_openapi::api::core::v1::Pod;
 use kube::{Api, api::AttachParams};
 use snafu::ResultExt;
 
-use crate::{config::Config, error, error::Error, ext::ApiPodExt, ssh};
+use crate::{
+    cli::{Error, error},
+    config::Config,
+    ext::ApiPodExt,
+    ssh,
+};
 
 #[derive(Args, Clone)]
 pub struct SetupCommand {

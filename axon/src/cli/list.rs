@@ -5,7 +5,10 @@ use kube::{Api, api::ListParams};
 use snafu::ResultExt;
 use tokio::io::AsyncWriteExt;
 
-use crate::{error, error::Error, ui::table::PodListExt};
+use crate::{
+    cli::{error, error::Error},
+    ui::table::PodListExt,
+};
 
 #[derive(Args, Clone)]
 pub struct ListCommand {
