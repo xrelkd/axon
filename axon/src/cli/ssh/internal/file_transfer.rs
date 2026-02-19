@@ -7,12 +7,12 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub enum Transfer {
+pub enum FileTransfer {
     Upload { source: PathBuf, destination: PathBuf },
     Download { source: PathBuf, destination: PathBuf },
 }
 
-pub struct TransferRunner {
+pub struct FileTransferRunner {
     pub handle: sigfinn::Handle<Error>,
 
     pub socket_addr: SocketAddr,
@@ -21,10 +21,10 @@ pub struct TransferRunner {
 
     pub user: String,
 
-    pub transfer: Transfer,
+    pub transfer: FileTransfer,
 }
 
-impl TransferRunner {
+impl FileTransferRunner {
     pub async fn run(self, shutdown_signal: impl Future<Output = ()> + Unpin) -> Result<(), Error> {
         let Self { handle, socket_addr, ssh_private_key, user, transfer } = self;
 
@@ -34,7 +34,7 @@ impl TransferRunner {
         let session = ssh::Session::connect(ssh_private_key, user, socket_addr).await?;
 
         let transfer_result = match transfer {
-            Transfer::Upload { source, destination } => {
+            FileTransfer::Upload { source, destination } => {
                 let pb = FileTransferProgressBar::new_upload();
                 let n = session
                     .upload(
@@ -50,7 +50,7 @@ impl TransferRunner {
                 }
                 n
             }
-            Transfer::Download { source, destination } => {
+            FileTransfer::Download { source, destination } => {
                 let pb = FileTransferProgressBar::new_download();
                 let n = session
                     .download(

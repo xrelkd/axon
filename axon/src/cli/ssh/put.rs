@@ -9,7 +9,7 @@ use crate::{
     cli::{
         Error, error,
         internal::ApiPodExt,
-        ssh::internal::{Configurator, DEFAULT_SSH_PORT, Transfer, TransferRunner},
+        ssh::internal::{Configurator, DEFAULT_SSH_PORT, FileTransfer, FileTransferRunner},
     },
     config::Config,
     ext::PodExt,
@@ -122,12 +122,12 @@ impl PutCommand {
                 }
             };
 
-            let result = TransferRunner {
+            let result = FileTransferRunner {
                 handle,
                 socket_addr,
                 ssh_private_key,
                 user,
-                transfer: Transfer::Upload { source, destination },
+                transfer: FileTransfer::Upload { source, destination },
             }
             .run(shutdown_signal)
             .await;
