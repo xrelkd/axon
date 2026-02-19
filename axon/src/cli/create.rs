@@ -194,7 +194,12 @@ pub enum Mode {
         )]
         image_pull_policy: ImagePullPolicy,
 
-        #[arg(long = "command", action = ArgAction::Append, default_value = "sh", help = "Command")]
+        #[arg(
+            long = "command",
+            action = ArgAction::Append,
+            default_value = "sh",
+            help = "The command to execute on container"
+        )]
         command: Vec<String>,
 
         #[arg(
@@ -205,10 +210,19 @@ pub enum Mode {
         )]
         args: Vec<String>,
 
-        #[arg(long = "shell", action = ArgAction::Append, default_value = "/bin/sh", help = "Interactive shell")]
+        #[arg(
+            long = "shell",
+            action = ArgAction::Append,
+            default_value = "/bin/sh",
+            help = "Interactive shell"
+        )]
         interactive_shell: Vec<String>,
 
-        #[arg(long = "ports", action = ArgAction::Append, help = "Port mappings")]
+        #[arg(
+            long = "ports",
+            action = ArgAction::Append,
+            help = "Port mappings"
+        )]
         port_mappings: Vec<PortMapping>,
     },
 }

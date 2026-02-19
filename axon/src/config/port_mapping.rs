@@ -23,7 +23,7 @@ impl PortMapping {
         let Self { container_port, local_port, address } = self;
         (
             format!("{}/{container_port}", *annotations::PORT_MAPPINGS_PREFIX),
-            format!("{address}:{local_port}",),
+            format!("{address}:{local_port}"),
         )
     }
 
