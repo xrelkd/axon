@@ -18,6 +18,9 @@ pub enum Error {
     #[snafu(display("{source}"))]
     PortForwarder { source: crate::port_forwarder::Error },
 
+    #[snafu(display("{source}"))]
+    PodConsole { source: crate::pod_console::Error },
+
     #[snafu(display("Spec {spec_name} is not found"))]
     SpecNotFound { spec_name: String },
 
@@ -37,14 +40,6 @@ pub enum Error {
 
     #[snafu(display("Failed to delete pod {pod_name} in namespace {namespace}, error: {source}"))]
     DeletePod {
-        namespace: String,
-        pod_name: String,
-        #[snafu(source(from(kube::Error, Box::new)))]
-        source: Box<kube::Error>,
-    },
-
-    #[snafu(display("Failed to attach pod {pod_name} in namespace {namespace}, error: {source}"))]
-    AttachPod {
         namespace: String,
         pod_name: String,
         #[snafu(source(from(kube::Error, Box::new)))]
@@ -90,24 +85,6 @@ pub enum Error {
     #[snafu(display("Could not create tokio runtime, error: {source}"))]
     InitializeTokioRuntime { source: std::io::Error },
 
-    #[snafu(display("Error occurs while copying I/O bidirectionally, error: {source}"))]
-    CopyBidirectionalIo { source: std::io::Error },
-
-    #[snafu(display("{stream} requested but missing"))]
-    GetPodStream { stream: &'static str },
-
-    #[snafu(display("Failed to get terminal size, error: {source}"))]
-    GetTerminalSize { source: std::io::Error },
-
-    #[snafu(display("Failed to change terminal size"))]
-    ChangeTerminalSize,
-
-    #[snafu(display("Failed to create signal stream, error: {source}"))]
-    CreateSignalStream { source: std::io::Error },
-
-    #[snafu(display("Failed to get terminal size writer"))]
-    GetTerminalSizeWriter,
-
     #[snafu(display(
         "Failed to upload or authorize the SSH key in the pod {pod_name}, error: {source}"
     ))]
@@ -136,4 +113,8 @@ impl From<crate::ui::terminal::Error> for Error {
 
 impl From<crate::port_forwarder::Error> for Error {
     fn from(source: crate::port_forwarder::Error) -> Self { Self::PortForwarder { source } }
+}
+
+impl From<crate::pod_console::Error> for Error {
+    fn from(source: crate::pod_console::Error) -> Self { Self::PodConsole { source } }
 }

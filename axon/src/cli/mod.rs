@@ -1,6 +1,7 @@
 mod attach;
 mod create;
 mod delete;
+mod execute;
 mod image;
 mod list;
 mod port_forward;
@@ -14,8 +15,8 @@ use snafu::ResultExt;
 use tokio::runtime::Runtime;
 
 use self::{
-    attach::AttachCommand, create::CreateCommand, delete::DeleteCommand, image::ImageCommands,
-    list::ListCommand, port_forward::PortForwardCommand, ssh::SshCommands,
+    attach::AttachCommand, create::CreateCommand, delete::DeleteCommand, execute::ExecuteCommand,
+    image::ImageCommands, list::ListCommand, port_forward::PortForwardCommand, ssh::SshCommands,
 };
 use crate::{
     config::Config,
@@ -72,6 +73,9 @@ pub enum Commands {
 
     #[command(alias = "a", about = "Attach to a pod in a specific namespace")]
     Attach(AttachCommand),
+
+    #[command(alias = "e", about = "Execute command on a pod in a specific namespace")]
+    Execute(ExecuteCommand),
 
     #[command(alias = "l", about = "List all pods created by axon")]
     List(ListCommand),
@@ -165,6 +169,7 @@ impl Cli {
                 Some(Commands::Delete(cmd)) => cmd.run(kube_client).await?,
                 Some(Commands::List(cmd)) => cmd.run(kube_client).await?,
                 Some(Commands::Attach(cmd)) => cmd.run(kube_client, config).await?,
+                Some(Commands::Execute(cmd)) => cmd.run(kube_client, config).await?,
                 Some(Commands::PortForward(cmd)) => cmd.run(kube_client, config).await?,
                 Some(Commands::Image { commands }) => commands.run(config).await?,
                 Some(Commands::Ssh { commands }) => commands.run(kube_client, config).await?,

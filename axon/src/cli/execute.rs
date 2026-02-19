@@ -4,23 +4,15 @@ use clap::Args;
 use k8s_openapi::api::core::v1::Pod;
 use kube::Api;
 
-use crate::{
-    config::Config,
-    error::Error,
-    ext::{ApiPodExt, PodExt},
-    pod_console::PodConsole,
-};
+use crate::{config::Config, error::Error, ext::ApiPodExt, pod_console::PodConsole};
 
 #[derive(Args, Clone)]
-pub struct AttachCommand {
+pub struct ExecuteCommand {
     #[arg(short, long, help = "Namespace of the pod")]
     pub namespace: Option<String>,
 
     #[arg(short = 'p', long = "pod-name", help = "Name of the pod to attach to")]
     pub pod_name: Option<String>,
-
-    #[arg(short = 's', long = "shell", help = "Interactive shell used to attach container")]
-    pub interactive_shell: Vec<String>,
 
     #[arg(
         short = 't',
@@ -29,11 +21,14 @@ pub struct AttachCommand {
         help = "The maximum time in seconds to wait before timing out"
     )]
     pub timeout_secs: u64,
+
+    #[arg(help = "Command to execute on the container", required = true)]
+    pub command: Vec<String>,
 }
 
-impl AttachCommand {
+impl ExecuteCommand {
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
-        let Self { namespace, pod_name, interactive_shell, timeout_secs } = self;
+        let Self { namespace, pod_name, command, timeout_secs } = self;
 
         // Resolve Identity
         let namespace = namespace
@@ -45,15 +40,11 @@ impl AttachCommand {
 
         // Resolve Pod API & Status
         let api = Api::<Pod>::namespaced(kube_client, &namespace);
-        let pod = api
+        let _pod = api
             .await_running_status(&pod_name, &namespace, Duration::from_secs(timeout_secs))
             .await?;
 
-        // Resolve Shell
-        let shell =
-            if interactive_shell.is_empty() { pod.interactive_shell() } else { interactive_shell };
-
         // Delegate behavior
-        PodConsole::new(api, pod_name, namespace, shell).attach().await.map_err(Error::from)
+        PodConsole::new(api, pod_name, namespace, command).attach().await.map_err(Error::from)
     }
 }

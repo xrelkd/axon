@@ -2,6 +2,7 @@ mod cli;
 mod config;
 mod error;
 mod ext;
+mod pod_console;
 mod port_forwarder;
 mod ssh;
 mod ui;
