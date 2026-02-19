@@ -1,5 +1,4 @@
 mod error;
-
 use std::{
     future::Future,
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -8,6 +7,7 @@ use std::{
 
 use k8s_openapi::api::core::v1::Pod;
 use kube::Api;
+use snafu::IntoError;
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::mpsc,
@@ -106,71 +106,88 @@ where
             on_ready(actual_addr);
         }
 
-        // --- Orchestration Tools ---
+        // Orchestration Tools
         let (event_sender, mut event_receiver) = mpsc::channel::<Event>(32);
         let cancel_token = CancellationToken::new();
 
         // 1. Shutdown Watcher Task
         // Listens for the external signal and triggers the internal cancellation
-        let tx_shutdown = event_sender.clone();
-        let token_shutdown = cancel_token.clone();
-        join_set.spawn(async move {
-            tokio::select! {
-                _ = shutdown_signal => {
-                    tracing::debug!("Shutdown signal received, notifying loop...");
-                    let _ = tx_shutdown.send(Event::Shutdown).await;
+        join_set.spawn({
+            let event_sender = event_sender.clone();
+            let token_shutdown = cancel_token.clone();
+            async move {
+                tokio::select! {
+                    _ = shutdown_signal => {
+                        tracing::debug!("Shutdown signal received, notifying loop...");
+                        let _ = event_sender.send(Event::Shutdown).await;
+                    }
+                    _ = token_shutdown.cancelled() => {
+                        tracing::debug!("Shutdown task cancelled internally.");
+                        let _ = event_sender.send(Event::Shutdown).await;
+                    }
                 }
-                _ = token_shutdown.cancelled() => {
-                    tracing::debug!("Shutdown task cancelled internally.");
-                    let _ = tx_shutdown.send(Event::Shutdown).await;
-                }
+                Ok(())
             }
-            Ok(())
         });
 
         // 2. Accept Task
-        let tx_accept = event_sender.clone();
-        let token_accept = cancel_token.clone();
-        join_set.spawn(async move {
-            loop {
-                let maybe_conn = tokio::select! {
-                    _ = token_accept.cancelled() => break,
-                    conn = listener.accept() => conn,
-                };
+        join_set.spawn({
+            let event_sender = event_sender.clone();
+            let token_accept = cancel_token.clone();
 
-                if let Ok((stream, peer)) = maybe_conn
-                    && tx_accept.send(Event::NewConnection { stream, peer }).await.is_err()
-                {
-                    break;
+            async move {
+                loop {
+                    let conn = tokio::select! {
+                        _ = token_accept.cancelled() => break,
+                        conn = listener.accept() => conn,
+                    };
+
+                    if let Ok((stream, peer)) = conn
+                        && event_sender.send(Event::NewConnection { stream, peer }).await.is_err()
+                    {
+                        break;
+                    }
                 }
+                tracing::debug!("Accept task exited.");
+                Ok(())
             }
-            tracing::debug!("Accept task exited.");
-            Ok(())
         });
 
         // 3. Reap/Timer Task
-        let tx_reap = event_sender.clone();
-        let token_reap = cancel_token.clone();
-        join_set.spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(5));
-            loop {
-                tokio::select! {
-                    _ = token_reap.cancelled() => break,
-                    _ = interval.tick() => {}
+        join_set.spawn({
+            let event_sender = event_sender.clone();
+            let token_reap = cancel_token.clone();
+            async move {
+                let mut interval = tokio::time::interval(Duration::from_secs(5));
+                loop {
+                    tokio::select! {
+                        _ = token_reap.cancelled() => break,
+                        _ = interval.tick() => {}
+                    }
+                    if event_sender.send(Event::ReapConnections).await.is_err() {
+                        break;
+                    }
                 }
-                if tx_reap.send(Event::ReapConnections).await.is_err() {
-                    break;
-                }
+                tracing::debug!("Reap task exited.");
+                Ok(())
             }
-            tracing::debug!("Reap task exited.");
-            Ok(())
         });
+
+        // Create the base handler template
+        let connection_handler_factory = ConnectionHandler {
+            api,
+            pod_name,
+            remote_port,
+            actual_addr,
+            cancel_token: cancel_token.clone(),
+        };
 
         while let Some(event) = event_receiver.recv().await {
             match event {
                 Event::Shutdown => {
                     tracing::info!("Initiating graceful shutdown...");
-                    cancel_token.cancel(); // Signal all background tasks to stop
+                    // Signal all background tasks to stop
+                    cancel_token.cancel();
                     break;
                 }
                 Event::ReapConnections => {
@@ -180,41 +197,8 @@ where
                         }
                     }
                 }
-                Event::NewConnection { mut stream, peer } => {
-                    let api = api.clone();
-                    let pod_name = pod_name.clone();
-                    let stream_id = format!("stream-{actual_addr}-{}", peer.port());
-                    let token_conn = cancel_token.clone();
-
-                    join_set.spawn(async move {
-                        let pf_res = api
-                            .portforward(&pod_name, &[remote_port])
-                            .await
-                            .map(|mut pf| pf.take_stream(remote_port));
-
-                        let mut pod_stream = match pf_res {
-                            Ok(Some(s)) => s,
-                            Ok(None) => return Ok(()),
-                            Err(source) => {
-                                return Err(Error::CreatePodStream {
-                                    stream_id,
-                                    source: Box::new(source),
-                                });
-                            }
-                        };
-
-                        tracing::info!("Bridging connection for peer {peer}");
-
-                        // We use select here so individual connections also respect the global
-                        // shutdown
-                        tokio::select! {
-                            _ = token_conn.cancelled() => {
-                                tracing::debug!("Closing connection {} due to shutdown", peer);
-                            }
-                            _ = tokio::io::copy_bidirectional(&mut stream, &mut pod_stream) => {}
-                        }
-                        Ok(())
-                    });
+                Event::NewConnection { stream, peer } => {
+                    join_set.spawn(connection_handler_factory.create().handle(stream, peer));
                 }
             }
         }
@@ -233,6 +217,55 @@ where
         }
 
         tracing::info!("Port forwarder exit complete.");
+        Ok(())
+    }
+}
+
+/// Encapsulates the configuration needed to bridge a local connection to a K8s
+/// Pod.
+#[derive(Clone)]
+struct ConnectionHandler {
+    api: Api<Pod>,
+    pod_name: String,
+    remote_port: u16,
+    actual_addr: SocketAddr,
+    cancel_token: CancellationToken,
+}
+
+impl ConnectionHandler {
+    #[inline]
+    fn create(&self) -> Self { self.clone() }
+
+    async fn handle(self, mut local_stream: TcpStream, peer: SocketAddr) -> Result<(), Error> {
+        let Self { api, pod_name, remote_port, actual_addr, cancel_token } = self;
+
+        let stream_id = format!("stream-{actual_addr}-{}", peer.port());
+
+        // Establish the K8s Portforward stream
+        let pf_res = api
+            .portforward(&pod_name, &[remote_port])
+            .await
+            .map(|mut pf| pf.take_stream(remote_port));
+
+        let mut pod_stream = match pf_res {
+            Ok(Some(s)) => s,
+            Ok(None) => return Ok(()),
+            Err(source) => return Err(error::CreatePodStreamSnafu { stream_id }.into_error(source)),
+        };
+
+        //
+        tracing::info!("Bridging connection: {peer} <-> {pod_name}:{remote_port}");
+
+        tokio::select! {
+            _ = cancel_token.cancelled() => {
+                tracing::debug!("Closing connection {peer} due to shutdown");
+            }
+            res = tokio::io::copy_bidirectional(&mut local_stream, &mut pod_stream) => {
+                if let Err(err) = res {
+                    tracing::debug!("Connection {peer} closed with error: {err}");
+                }
+            }
+        }
         Ok(())
     }
 }
