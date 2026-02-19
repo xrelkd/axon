@@ -79,8 +79,10 @@ impl Session {
         channel.exec(true, command).await.context(error::ExecuteCommandSnafu)?;
 
         let code;
-        let mut stdin = tokio_fd::AsyncFd::try_from(0).context(error::InitializeStdioSnafu)?;
-        let mut stdout = tokio_fd::AsyncFd::try_from(1).context(error::InitializeStdioSnafu)?;
+        let mut stdin = tokio_fd::AsyncFd::try_from(0)
+            .context(error::InitializeStdioSnafu { stream: "stdin" })?;
+        let mut stdout = tokio_fd::AsyncFd::try_from(1)
+            .context(error::InitializeStdioSnafu { stream: "stdout" })?;
         let mut buf = vec![0; 4096];
         let mut stdin_closed = false;
 

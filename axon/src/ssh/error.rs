@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{borrow::Cow, path::PathBuf};
 
 use snafu::Snafu;
 
@@ -44,8 +44,8 @@ pub enum Error {
     #[snafu(display("Failed to determine terminal size: {source}"))]
     GetTerminalSize { source: std::io::Error },
 
-    #[snafu(display("Failed to initialize standard I/O streams: {source}"))]
-    InitializeStdio { source: std::io::Error },
+    #[snafu(display("Failed to initialize standard I/O streams ({stream}), error: {source}"))]
+    InitializeStdio { stream: Cow<'static, str>, source: std::io::Error },
 
     #[snafu(display("Failed to write to local stdout: {source}"))]
     WriteStdout { source: std::io::Error },

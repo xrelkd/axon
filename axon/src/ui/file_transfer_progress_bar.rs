@@ -45,7 +45,7 @@ impl FileTransferProgressBar {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum Direction {
+enum Direction {
     Download,
     Upload,
 }

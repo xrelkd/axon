@@ -89,7 +89,7 @@ impl PodConsole {
         loop {
             tokio::select! {
                 _ = &mut attached_join => {
-                    tracing::debug!("Pod connection closed by remote.");
+                    tracing::debug!("Pod connection closed by remote");
                     break;
                 },
                 res = local_stdin.read(&mut in_buffer) => {
