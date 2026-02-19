@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, path::PathBuf, time::Duration};
+use std::{path::PathBuf, time::Duration};
 
 use clap::Args;
 use k8s_openapi::api::core::v1::Pod;
@@ -8,7 +8,7 @@ use sigfinn::{ExitStatus, LifecycleManager};
 use crate::{
     cli::{
         Error, error,
-        ssh::internal::{DEFAULT_SSH_PORT, HandleGuard, SshConfigurator},
+        ssh::internal::{DEFAULT_SSH_PORT, SshConfigurator, Transfer, TransferRunner},
     },
     config::Config,
     ext::{ApiPodExt, PodExt},
@@ -17,7 +17,7 @@ use crate::{
 };
 
 #[derive(Args, Clone)]
-pub struct CopyCommand {
+pub struct PutCommand {
     #[arg(short, long, help = "Namespace of the pod")]
     namespace: Option<String>,
 
@@ -38,14 +38,14 @@ pub struct CopyCommand {
     #[arg(short = 'u', long = "user", default_value = "root", help = "User name")]
     user: String,
 
-    #[arg(help = "source file")]
+    #[arg(help = "Source file")]
     source: PathBuf,
 
-    #[arg(help = "destination")]
+    #[arg(help = "Destination file")]
     destination: PathBuf,
 }
 
-impl CopyCommand {
+impl PutCommand {
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
         let Self {
             namespace,
@@ -121,10 +121,15 @@ impl CopyCommand {
                 }
             };
 
-            let result =
-                SshFileCopier { handle, socket_addr, ssh_private_key, user, source, destination }
-                    .run()
-                    .await;
+            let result = TransferRunner {
+                handle,
+                socket_addr,
+                ssh_private_key,
+                user,
+                transfer: Transfer::Upload { source, destination },
+            }
+            .run()
+            .await;
             match result {
                 Ok(()) => ExitStatus::Success,
                 Err(err) => ExitStatus::Error(err),
@@ -137,34 +142,5 @@ impl CopyCommand {
         } else {
             Ok(())
         }
-    }
-}
-
-struct SshFileCopier {
-    handle: sigfinn::Handle<Error>,
-    socket_addr: SocketAddr,
-    ssh_private_key: russh::keys::PrivateKey,
-    user: String,
-    source: PathBuf,
-    destination: PathBuf,
-}
-
-impl SshFileCopier {
-    async fn run(self) -> Result<(), Error> {
-        let Self { handle, socket_addr, ssh_private_key, user, source, destination } = self;
-
-        // Automatically shuts down the port forwarder when this scope ends
-        let _handle_guard = HandleGuard::from(handle);
-
-        let session = ssh::Session::connect(ssh_private_key, user, socket_addr).await?;
-
-        let transfer_result = session.transfer_file(source, destination).await;
-
-        // Attempt to close the session cleanly
-        let close_result = session.close().await;
-
-        // Return the execution error if it exists, otherwise the closing error
-        transfer_result.map(|_| ()).map_err(Error::from)?;
-        close_result.map_err(Error::from)
     }
 }

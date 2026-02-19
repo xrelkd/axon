@@ -124,32 +124,7 @@ impl Session {
         Ok(code)
     }
 
-    pub async fn transfer_file<S, D>(&self, source: S, destination: D) -> Result<(), Error>
-    where
-        S: AsRef<Path>,
-        D: AsRef<Path>,
-    {
-        let source = source.as_ref();
-        let destination = destination.as_ref();
-
-        let channel = self.session.channel_open_session().await.context(error::OpenSftpSnafu)?;
-        channel.request_subsystem(true, "sftp").await.context(error::OpenSftpSnafu)?;
-
-        let sftp = SftpSession::new(channel.into_stream())
-            .await
-            .with_context(|_| error::OpenSftpSessionSnafu)?;
-
-        // 4. Execute Transfer
-        if source.exists() {
-            tracing::info!(src = ?source, dst = ?destination, "Uploading local file to container");
-            self.upload(&sftp, &source, &destination).await
-        } else {
-            tracing::info!(src = ?source, dst = ?destination, "Downloading file from container to local");
-            self.download(&sftp, &source, &destination).await
-        }
-    }
-
-    async fn upload<S, D>(&self, sftp: &SftpSession, src: S, dst: D) -> Result<(), Error>
+    pub async fn upload<S, D>(&self, src: S, dst: D) -> Result<u64, Error>
     where
         S: AsRef<Path>,
         D: AsRef<Path>,
@@ -161,27 +136,21 @@ impl Session {
             LocalFile::open(src).await.context(error::OpenLocalFileSnafu { path: src })?;
 
         let dst_str = dst.to_string_lossy().to_string();
+
+        let sftp = self.prepare_sftp_session().await?;
         let mut remote_file = sftp
             .open_with_flags(&dst_str, OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE)
             .await
             .map_err(|source| Error::OpenRemoteFile { path: dst_str, source })?;
 
-        let mut buffer = vec![0; 16384];
-        while let Ok(n) = local_file.read(&mut buffer).await {
-            if n == 0 {
-                break;
-            }
-            remote_file
-                .write_all(&buffer[..n])
-                .await
-                .context(error::TransferDataSnafu { path: src })?;
-        }
-
+        let n = tokio::io::copy(&mut local_file, &mut remote_file)
+            .await
+            .context(error::TransferDataSnafu { path: src })?;
         let _ = remote_file.shutdown().await.ok();
-        Ok(())
+        Ok(n)
     }
 
-    async fn download<S, D>(&self, sftp: &SftpSession, src: S, dst: D) -> Result<(), Error>
+    pub async fn download<S, D>(&self, src: S, dst: D) -> Result<u64, Error>
     where
         S: AsRef<Path>,
         D: AsRef<Path>,
@@ -190,6 +159,8 @@ impl Session {
         let dst = dst.as_ref();
 
         let src_str = src.to_string_lossy().to_string();
+
+        let sftp = self.prepare_sftp_session().await?;
         let mut remote_file = sftp
             .open_with_flags(&src_str, OpenFlags::READ)
             .await
@@ -198,18 +169,9 @@ impl Session {
         let mut local_file =
             LocalFile::create(dst).await.context(error::OpenLocalFileSnafu { path: dst })?;
 
-        let mut buffer = vec![0; 16384];
-        while let Ok(n) = remote_file.read(&mut buffer).await {
-            if n == 0 {
-                break;
-            }
-            local_file
-                .write_all(&buffer[..n])
-                .await
-                .context(error::TransferDataSnafu { path: dst })?;
-        }
-
-        Ok(())
+        tokio::io::copy(&mut remote_file, &mut local_file)
+            .await
+            .context(error::TransferDataSnafu { path: dst })
     }
 
     pub async fn close(self) -> Result<(), Error> {
@@ -218,5 +180,12 @@ impl Session {
             .await
             .context(error::DisconnectSessionSnafu)?;
         Ok(())
+    }
+
+    async fn prepare_sftp_session(&self) -> Result<SftpSession, Error> {
+        let channel = self.session.channel_open_session().await.context(error::OpenSftpSnafu)?;
+        channel.request_subsystem(true, "sftp").await.context(error::OpenSftpSnafu)?;
+
+        SftpSession::new(channel.into_stream()).await.with_context(|_| error::OpenSftpSessionSnafu)
     }
 }
