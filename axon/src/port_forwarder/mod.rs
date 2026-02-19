@@ -32,8 +32,8 @@ where
     pod_name: String,
     local_addr: SocketAddr,
     remote_port: u16,
-    join_set: JoinSet<Result<(), Error>>,
     on_ready: Option<F>,
+    join_set: JoinSet<Result<(), Error>>,
 }
 
 pub struct PortForwarderBuilder<F> {
@@ -44,21 +44,23 @@ pub struct PortForwarderBuilder<F> {
     on_ready: Option<F>,
 }
 
-impl<F> PortForwarderBuilder<F>
-where
-    F: FnOnce(SocketAddr) + Send + 'static,
-{
+impl<F> PortForwarderBuilder<F> {
     pub fn new(api: Api<Pod>, pod_name: impl Into<String>, remote_port: u16) -> Self {
         Self { api, pod_name: pod_name.into(), remote_port, local_addr: None, on_ready: None }
     }
 
-    pub fn local_address(mut self, addr: SocketAddr) -> Self {
+    pub const fn local_address(mut self, addr: SocketAddr) -> Self {
         self.local_addr = Some(addr);
         self
     }
+}
 
-    pub fn on_ready(self, callback: F) -> PortForwarderBuilder<F> {
-        PortForwarderBuilder {
+impl<F> PortForwarderBuilder<F>
+where
+    F: FnOnce(SocketAddr) + Send + 'static,
+{
+    pub fn on_ready(self, callback: F) -> Self {
+        Self {
             api: self.api,
             pod_name: self.pod_name,
             local_addr: self.local_addr,
@@ -68,17 +70,10 @@ where
     }
 
     pub fn build(self) -> PortForwarder<F> {
+        let Self { api, pod_name, local_addr, remote_port, on_ready } = self;
         let local_addr =
-            self.local_addr.unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0));
-
-        PortForwarder {
-            api: self.api,
-            pod_name: self.pod_name,
-            local_addr,
-            remote_port: self.remote_port,
-            join_set: JoinSet::new(),
-            on_ready: self.on_ready,
-        }
+            local_addr.unwrap_or_else(|| SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0));
+        PortForwarder { api, pod_name, local_addr, remote_port, on_ready, join_set: JoinSet::new() }
     }
 }
 
@@ -86,11 +81,12 @@ impl<F> PortForwarder<F>
 where
     F: FnOnce(SocketAddr) + Send + 'static,
 {
+    #[allow(clippy::too_many_lines)]
     pub async fn run(
         self,
         shutdown_signal: impl Future<Output = ()> + Send + Unpin + 'static,
     ) -> Result<(), Error> {
-        let Self { api, pod_name, local_addr, remote_port, mut join_set, on_ready } = self;
+        let Self { api, pod_name, local_addr, remote_port, on_ready, mut join_set } = self;
 
         let listener = TcpListener::bind(&local_addr)
             .await
@@ -112,18 +108,18 @@ where
 
         // 1. Shutdown Watcher Task
         // Listens for the external signal and triggers the internal cancellation
-        join_set.spawn({
+        let _unused = join_set.spawn({
             let event_sender = event_sender.clone();
             let token_shutdown = cancel_token.clone();
             async move {
                 tokio::select! {
-                    _ = shutdown_signal => {
+                    () = shutdown_signal => {
                         tracing::debug!("Shutdown signal received, notifying loop...");
-                        let _ = event_sender.send(Event::Shutdown).await;
+                        drop(event_sender.send(Event::Shutdown).await);
                     }
-                    _ = token_shutdown.cancelled() => {
+                    () = token_shutdown.cancelled() => {
                         tracing::debug!("Shutdown task cancelled internally.");
-                        let _ = event_sender.send(Event::Shutdown).await;
+                        drop(event_sender.send(Event::Shutdown).await);
                     }
                 }
                 Ok(())
@@ -131,14 +127,14 @@ where
         });
 
         // 2. Accept Task
-        join_set.spawn({
+        let _unused = join_set.spawn({
             let event_sender = event_sender.clone();
             let token_accept = cancel_token.clone();
 
             async move {
                 loop {
                     let conn = tokio::select! {
-                        _ = token_accept.cancelled() => break,
+                        () = token_accept.cancelled() => break,
                         conn = listener.accept() => conn,
                     };
 
@@ -154,14 +150,14 @@ where
         });
 
         // 3. Reap/Timer Task
-        join_set.spawn({
+        let _unused = join_set.spawn({
             let event_sender = event_sender.clone();
             let token_reap = cancel_token.clone();
             async move {
                 let mut interval = tokio::time::interval(Duration::from_secs(5));
                 loop {
                     tokio::select! {
-                        _ = token_reap.cancelled() => break,
+                        () = token_reap.cancelled() => break,
                         _ = interval.tick() => {}
                     }
                     if event_sender.send(Event::ReapConnections).await.is_err() {
@@ -198,7 +194,8 @@ where
                     }
                 }
                 Event::NewConnection { stream, peer } => {
-                    join_set.spawn(connection_handler_factory.create().handle(stream, peer));
+                    let _unused =
+                        join_set.spawn(connection_handler_factory.create().handle(stream, peer));
                 }
             }
         }
@@ -257,7 +254,7 @@ impl ConnectionHandler {
         tracing::info!("Bridging connection: {peer} <-> {pod_name}:{remote_port}");
 
         tokio::select! {
-            _ = cancel_token.cancelled() => {
+            () = cancel_token.cancelled() => {
                 tracing::debug!("Closing connection {peer} due to shutdown");
             }
             res = tokio::io::copy_bidirectional(&mut local_stream, &mut pod_stream) => {

@@ -8,9 +8,6 @@ pub enum Error {
     #[snafu(display("Failed to bind TCP socket {socket_address}, error: {source}"))]
     BindTcpSocket { socket_address: SocketAddr, source: std::io::Error },
 
-    #[snafu(display("Failed to accept TCP socket {socket_address}, error: {source}"))]
-    AcceptTcpSocket { socket_address: SocketAddr, source: std::io::Error },
-
     #[snafu(display("Failed to create pod stream {stream_id}, error: {source}"))]
     CreatePodStream {
         stream_id: String,

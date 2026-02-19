@@ -1,18 +1,15 @@
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    path::PathBuf,
-    time::Duration,
-};
+use std::{path::PathBuf, time::Duration};
 
 use clap::{ArgAction, Args};
 use k8s_openapi::api::core::v1::Pod;
 use kube::Api;
-use sigfinn::LifecycleManager;
+use sigfinn::{ExitStatus, LifecycleManager};
 
 use crate::{
     config::Config,
     error::{self, Error},
     ext::{ApiPodExt, PodExt},
+    port_forwarder::PortForwarderBuilder,
     ssh,
     ui::terminal::TerminalRawModeGuard,
 };
@@ -73,57 +70,39 @@ impl ShellCommand {
 
         let lifecycle_manager = LifecycleManager::<Error>::new();
 
-        let (ssh_local_socket_addr_sender, ssh_local_socket_addr_receiver) =
-            tokio::sync::oneshot::channel();
-        let handle = lifecycle_manager.handle();
-        let handle = lifecycle_manager.spawn("port-forwarder", move |shutdown_signal| async move {
-            let local_socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0);
+        let (handle, ssh_local_socket_addr_receiver) = {
+            let (sender, receiver) = tokio::sync::oneshot::channel();
             let on_ready = move |socket_addr| {
-                let _unused = ssh_local_socket_addr_sender.send(socket_addr);
+                let _unused = sender.send(socket_addr);
             };
-            api.port_forward(
-                &pod_name,
-                local_socket_addr,
-                remote_port,
+            let handle =
+                lifecycle_manager.spawn("port-forwarder", move |shutdown_signal| async move {
+                    let result = PortForwarderBuilder::new(api, pod_name, remote_port)
+                        .on_ready(on_ready)
+                        .build()
+                        .run(shutdown_signal)
+                        .await;
+                    match result {
+                        Ok(()) => ExitStatus::Success,
+                        Err(err) => ExitStatus::Error(Error::from(err)),
+                    }
+                });
+            (handle, receiver)
+        };
+
+        let _handle = lifecycle_manager.spawn("ssh-client", move |_| async move {
+            let result = SshClientRunner {
                 handle,
-                shutdown_signal,
-                on_ready,
-            )
-            .await
-        });
-        let _handle = lifecycle_manager.spawn("ssh-client", move |_shutdown_signal| async move {
-            let _handle_guard = HandleGuard::from(handle);
-            let ssh_local_socket_addr = match ssh_local_socket_addr_receiver.await {
-                Ok(addr) => addr,
-                Err(_err) => return sigfinn::ExitStatus::Success,
-            };
-
-            let session =
-                match ssh::Session::connect(ssh_private_key, user, ssh_local_socket_addr).await {
-                    Ok(session) => session,
-                    Err(err) => return sigfinn::ExitStatus::Error(Error::from(err)),
-                };
-            let _raw_mode_guard = match TerminalRawModeGuard::setup() {
-                Ok(guard) => guard,
-                Err(err) => return sigfinn::ExitStatus::Error(Error::from(err)),
-            };
-
-            // arguments are escaped manually since the SSH protocol doesn't support quoting
-            let remote_command = remote_command
-                .into_iter()
-                .map(|x| shell_escape::escape(x.into()))
-                .collect::<Vec<_>>()
-                .join(" ");
-            let _exit_code = match session.call(&remote_command).await {
-                Ok(exit_code) => exit_code,
-                Err(err) => {
-                    let _unused = session.close().await;
-                    return sigfinn::ExitStatus::Error(Error::from(err));
-                }
-            };
-            match session.close().await {
-                Ok(()) => sigfinn::ExitStatus::Success,
-                Err(err) => sigfinn::ExitStatus::Error(Error::from(err)),
+                addr_receiver: ssh_local_socket_addr_receiver,
+                ssh_private_key,
+                user,
+                remote_command,
+            }
+            .run()
+            .await;
+            match result {
+                Ok(()) => ExitStatus::Success,
+                Err(err) => ExitStatus::Error(err),
             }
         });
 
@@ -133,6 +112,47 @@ impl ShellCommand {
         } else {
             Ok(())
         }
+    }
+}
+
+struct SshClientRunner {
+    handle: sigfinn::Handle<Error>,
+    addr_receiver: tokio::sync::oneshot::Receiver<std::net::SocketAddr>,
+    ssh_private_key: russh::keys::PrivateKey,
+    user: String,
+    remote_command: Vec<String>,
+}
+
+impl SshClientRunner {
+    async fn run(self) -> Result<(), Error> {
+        let Self { handle, addr_receiver, ssh_private_key, user, remote_command } = self;
+
+        // Automatically shuts down the port forwarder when this scope ends
+        let _handle_guard = HandleGuard::from(handle);
+
+        let ssh_local_socket_addr = addr_receiver.await.map_err(|_| {
+            error::GenericSnafu { message: "SSH local socket address receiver failed" }.build()
+        })?;
+
+        let session = ssh::Session::connect(ssh_private_key, user, ssh_local_socket_addr).await?;
+
+        // Enter raw mode to handle TTY interactions correctly
+        let _raw_mode_guard = TerminalRawModeGuard::setup()?;
+
+        let escaped_command = remote_command
+            .into_iter()
+            .map(|x| shell_escape::escape(x.into()))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let call_result = session.call(&escaped_command).await;
+
+        // Attempt to close the session cleanly
+        let close_result = session.close().await;
+
+        // Return the execution error if it exists, otherwise the closing error
+        call_result.map(|_| ()).map_err(Error::from)?;
+        close_result.map_err(Error::from)
     }
 }
 

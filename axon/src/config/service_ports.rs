@@ -17,7 +17,7 @@ impl ServicePorts {
     #[allow(dead_code)]
     pub const fn common() -> Self { Self { ssh: Some(22), http: Some(80), https: Some(443) } }
 
-    /// Aggregates multiple annotations into a single ServicePorts struct
+    /// Aggregates multiple annotations into a single `ServicePorts` struct
     /// from any iterator of key-value pairs.
     pub fn from_kubernetes_annotations<I, K, V>(iter: I) -> Self
     where

@@ -3,12 +3,13 @@ use std::{net::SocketAddr, time::Duration};
 use clap::Args;
 use k8s_openapi::api::core::v1::Pod;
 use kube::Api;
-use sigfinn::LifecycleManager;
+use sigfinn::{ExitStatus, LifecycleManager};
 
 use crate::{
     config::{Config, PortMapping},
     error::Error,
     ext::{ApiPodExt, PodExt},
+    port_forwarder::PortForwarderBuilder,
 };
 
 #[derive(Args, Clone)]
@@ -54,18 +55,19 @@ impl PortForwardCommand {
             let local_sock_addr = SocketAddr::new(address, local_port);
             let api = api.clone();
             let pod_name = pod_name.clone();
-            let handle = lifecycle_manager.handle();
             let worker_name = format!("forwarder-{local_sock_addr}/{pod_name}:{container_port}");
             let create_fn = move |shutdown_signal| async move {
-                api.port_forward(
-                    &pod_name,
-                    local_sock_addr,
-                    container_port,
-                    handle,
-                    shutdown_signal,
-                    |_| {},
-                )
-                .await
+                let result = PortForwarderBuilder::new(api, pod_name, container_port)
+                    .local_address(local_sock_addr)
+                    .on_ready(|_| {})
+                    .build()
+                    .run(shutdown_signal)
+                    .await;
+
+                match result {
+                    Ok(()) => ExitStatus::Success,
+                    Err(err) => ExitStatus::Error(Error::from(err)),
+                }
             };
             let _handle = lifecycle_manager.spawn(worker_name, create_fn);
         }

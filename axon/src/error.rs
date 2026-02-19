@@ -1,10 +1,11 @@
-use std::net::SocketAddr;
-
 use snafu::Snafu;
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum Error {
+    #[snafu(display("{message}"))]
+    Generic { message: String },
+
     #[snafu(display("{source}"))]
     Configuration { source: crate::config::Error },
 
@@ -107,23 +108,9 @@ pub enum Error {
     #[snafu(display("Failed to get terminal size writer"))]
     GetTerminalSizeWriter,
 
-    // FIXME: remove it
-    #[snafu(display("Failed to bind TCP socket {socket_address}, error: {source}"))]
-    BindTcpSocket { socket_address: SocketAddr, source: std::io::Error },
-
-    // FIXME: remove it
-    #[snafu(display("Failed to accept TCP socket {socket_address}, error: {source}"))]
-    AcceptTcpSocket { socket_address: SocketAddr, source: std::io::Error },
-
-    // FIXME: remove it
-    #[snafu(display("Failed to create pod stream {stream_id}, error: {source}"))]
-    CreatePodStream {
-        stream_id: String,
-        #[snafu(source(from(kube::Error, Box::new)))]
-        source: Box<kube::Error>,
-    },
-
-    #[snafu(display("Failed to upload or authorize the SSH key in the pod {pod_name}: {source}"))]
+    #[snafu(display(
+        "Failed to upload or authorize the SSH key in the pod {pod_name}, error: {source}"
+    ))]
     UploadSshKey {
         namespace: String,
         pod_name: String,

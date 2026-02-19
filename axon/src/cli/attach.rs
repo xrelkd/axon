@@ -40,28 +40,68 @@ pub struct AttachCommand {
 impl AttachCommand {
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
         let Self { namespace, pod_name, interactive_shell, timeout_secs } = self;
+
+        // Resolve Identity
         let namespace = namespace
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| kube_client.default_namespace().to_string());
+
         let pod_name =
             pod_name.filter(|s| !s.is_empty()).unwrap_or_else(|| config.default_pod_name.clone());
 
+        // Resolve Pod API & Status
         let api = Api::<Pod>::namespaced(kube_client, &namespace);
         let pod = api
             .await_running_status(&pod_name, &namespace, Duration::from_secs(timeout_secs))
             .await?;
 
-        let interactive_shell =
+        // Resolve Shell
+        let shell =
             if interactive_shell.is_empty() { pod.interactive_shell() } else { interactive_shell };
 
-        // Ensure we disable raw mode even if the app panics
+        // Delegate behavior
+        PodConsole::new(api, pod_name, namespace, shell).attach().await
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct PodConsole {
+    api: Api<Pod>,
+    pod_name: String,
+    namespace: String,
+    shell: Vec<String>,
+}
+
+impl PodConsole {
+    pub fn new<I, S>(
+        api: Api<Pod>,
+        pod_name: impl Into<String>,
+        namespace: impl Into<String>,
+        shell: I,
+    ) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Self {
+            api,
+            pod_name: pod_name.into(),
+            namespace: namespace.into(),
+            shell: shell.into_iter().map(Into::into).collect(),
+        }
+    }
+
+    pub async fn attach(self) -> Result<(), Error> {
+        let Self { api, pod_name, namespace, shell } = self;
+
+        // Setup Raw Mode Guard
         let _raw_mode_guard = TerminalRawModeGuard::setup()?;
 
-        // Attach into Pod
+        // Initiate Exec
         let mut attached = api
             .exec(
                 &pod_name,
-                interactive_shell,
+                shell,
                 &AttachParams {
                     stdin: true,
                     stdout: true,
@@ -71,47 +111,42 @@ impl AttachCommand {
                 },
             )
             .await
-            .with_context(|_| error::AttachPodSnafu { namespace, pod_name })?;
+            .with_context(|_| error::AttachPodSnafu {
+                namespace: namespace.clone(),
+                pod_name: pod_name.clone(),
+            })?;
 
-        // Setup Streams
+        // Extract Streams
         let pod_stdout =
             attached.stdout().context(error::GetPodStreamSnafu { stream: "stdout" })?;
         let pod_stdin = attached.stdin().context(error::GetPodStreamSnafu { stream: "stdin" })?;
+        let term_tx = attached.terminal_size().context(error::GetTerminalSizeWriterSnafu)?;
 
-        let local_stdout = tokio::io::stdout();
-        let local_stdin = tokio::io::stdin();
+        // Handle Terminal Resizing
+        let cancel_token = tokio_util::sync::CancellationToken::new();
+        let mut terminal_size_handle =
+            tokio::spawn(handle_terminal_size(term_tx, cancel_token.clone()));
 
-        // Combine Pod streams and Local streams
+        // Bidirectional Copy
         let mut pod_combined = tokio::io::join(pod_stdout, pod_stdin);
-        let mut local_combined = tokio::io::join(local_stdin, local_stdout);
-
-        let (mut terminal_size_handle, terminal_size_handle_cancel_token) = {
-            let terminal_size_handle_cancel_token = tokio_util::sync::CancellationToken::new();
-            let term_tx = attached.terminal_size().context(error::GetTerminalSizeWriterSnafu)?;
-            (
-                tokio::spawn(handle_terminal_size(
-                    term_tx,
-                    terminal_size_handle_cancel_token.clone(),
-                )),
-                terminal_size_handle_cancel_token,
-            )
-        };
+        let mut local_combined = tokio::io::join(tokio::io::stdin(), tokio::io::stdout());
 
         tokio::select! {
             result = tokio::io::copy_bidirectional(&mut local_combined, &mut pod_combined) => {
                 if let Err(err) = result && err.kind() != std::io::ErrorKind::BrokenPipe {
-                    Err(err).context(error::CopyBidirectionalIoSnafu)?;
+                    return Err(err).context(error::CopyBidirectionalIoSnafu);
                 }
             },
             result = &mut terminal_size_handle => {
                 match result {
                     Ok(_) => tracing::info!("End of terminal size stream"),
-                    Err(e) => tracing::warn!("Error getting terminal size: {e:?}")
+                    Err(err) => tracing::warn!("Error getting terminal size: {err}")
                 }
             },
         }
 
-        terminal_size_handle_cancel_token.cancel();
+        // 6. Cleanup
+        cancel_token.cancel();
         let _unused = terminal_size_handle.await;
         let _unused = attached.join().await;
 
