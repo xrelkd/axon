@@ -40,8 +40,8 @@ shadow-rs     = { workspace = true }
 shell-escape  = { workspace = true }
 snafu         = { workspace = true }
 
-russh   = { workspace = true }
-ssh-key = { workspace = true }
+russh      = { workspace = true }
+russh-sftp = { workspace = true }
 
 axon-base = { workspace = true }
 axon-cli  = { workspace = true }

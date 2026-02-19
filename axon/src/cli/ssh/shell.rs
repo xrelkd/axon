@@ -8,7 +8,7 @@ use sigfinn::{ExitStatus, LifecycleManager};
 use crate::{
     cli::{
         Error, error,
-        ssh::internal::{HandleGuard, SshConfigurator},
+        ssh::internal::{DEFAULT_SSH_PORT, HandleGuard, SshConfigurator},
     },
     config::Config,
     ext::{ApiPodExt, PodExt},
@@ -16,8 +16,6 @@ use crate::{
     ssh,
     ui::terminal::TerminalRawModeGuard,
 };
-
-const DEFAULT_SSH_PORT: u16 = 22;
 
 #[derive(Args, Clone)]
 pub struct ShellCommand {

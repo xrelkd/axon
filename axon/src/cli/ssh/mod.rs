@@ -5,7 +5,7 @@ mod shell;
 
 use clap::Subcommand;
 
-pub use self::{setup::SetupCommand, shell::ShellCommand};
+pub use self::{copy::CopyCommand, setup::SetupCommand, shell::ShellCommand};
 use crate::{cli::Error, config::Config};
 
 #[derive(Clone, Subcommand)]
@@ -15,6 +15,9 @@ pub enum SshCommands {
 
     #[command(about = "Connect to the SSH server in the container and open a interactive shell")]
     Shell(ShellCommand),
+
+    #[command(about = "Transfer files between local and container")]
+    Copy(CopyCommand),
 }
 
 impl SshCommands {
@@ -22,6 +25,7 @@ impl SshCommands {
         match self {
             Self::Setup(cmd) => cmd.run(kube_client, config).await,
             Self::Shell(cmd) => cmd.run(kube_client, config).await,
+            Self::Copy(cmd) => cmd.run(kube_client, config).await,
         }
     }
 }

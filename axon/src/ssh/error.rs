@@ -52,4 +52,19 @@ pub enum Error {
 
     #[snafu(display("Failed to disconnect session: {source}"))]
     DisconnectSession { source: russh::Error },
+
+    #[snafu(display("Failed to open SFTP subsystem: {source}"))]
+    OpenSftp { source: russh::Error },
+
+    #[snafu(display("Failed to open SFTP session: {source}"))]
+    OpenSftpSession { source: russh_sftp::client::error::Error },
+
+    #[snafu(display("Failed to open local file '{}': {source}", path.display()))]
+    OpenLocalFile { path: PathBuf, source: std::io::Error },
+
+    #[snafu(display("Failed to open remote file '{}': {source}", path))]
+    OpenRemoteFile { path: String, source: russh_sftp::client::error::Error },
+
+    #[snafu(display("Failed to transfer data for '{}': {}", path.display(), source))]
+    TransferData { path: PathBuf, source: std::io::Error },
 }

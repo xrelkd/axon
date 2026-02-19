@@ -1,11 +1,13 @@
-use std::{sync::Arc, time::Duration};
+use std::{path::Path, sync::Arc, time::Duration};
 
 use russh::{
     ChannelMsg, Disconnect, client,
     keys::{PrivateKey, PublicKey, key::PrivateKeyWithHashAlg},
 };
+use russh_sftp::{client::SftpSession, protocol::OpenFlags};
 use snafu::{IntoError, ResultExt};
 use tokio::{
+    fs::File as LocalFile,
     io::{AsyncReadExt, AsyncWriteExt},
     net::ToSocketAddrs,
 };
@@ -120,6 +122,94 @@ impl Session {
             }
         }
         Ok(code)
+    }
+
+    pub async fn transfer_file<S, D>(&self, source: S, destination: D) -> Result<(), Error>
+    where
+        S: AsRef<Path>,
+        D: AsRef<Path>,
+    {
+        let source = source.as_ref();
+        let destination = destination.as_ref();
+
+        let channel = self.session.channel_open_session().await.context(error::OpenSftpSnafu)?;
+        channel.request_subsystem(true, "sftp").await.context(error::OpenSftpSnafu)?;
+
+        let sftp = SftpSession::new(channel.into_stream())
+            .await
+            .with_context(|_| error::OpenSftpSessionSnafu)?;
+
+        // 4. Execute Transfer
+        if source.exists() {
+            tracing::info!(src = ?source, dst = ?destination, "Uploading local file to container");
+            self.upload(&sftp, &source, &destination).await
+        } else {
+            tracing::info!(src = ?source, dst = ?destination, "Downloading file from container to local");
+            self.download(&sftp, &source, &destination).await
+        }
+    }
+
+    async fn upload<S, D>(&self, sftp: &SftpSession, src: S, dst: D) -> Result<(), Error>
+    where
+        S: AsRef<Path>,
+        D: AsRef<Path>,
+    {
+        let src = src.as_ref();
+        let dst = dst.as_ref();
+
+        let mut local_file =
+            LocalFile::open(src).await.context(error::OpenLocalFileSnafu { path: src })?;
+
+        let dst_str = dst.to_string_lossy().to_string();
+        let mut remote_file = sftp
+            .open_with_flags(&dst_str, OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE)
+            .await
+            .map_err(|source| Error::OpenRemoteFile { path: dst_str, source })?;
+
+        let mut buffer = vec![0; 16384];
+        while let Ok(n) = local_file.read(&mut buffer).await {
+            if n == 0 {
+                break;
+            }
+            remote_file
+                .write_all(&buffer[..n])
+                .await
+                .context(error::TransferDataSnafu { path: src })?;
+        }
+
+        let _ = remote_file.shutdown().await.ok();
+        Ok(())
+    }
+
+    async fn download<S, D>(&self, sftp: &SftpSession, src: S, dst: D) -> Result<(), Error>
+    where
+        S: AsRef<Path>,
+        D: AsRef<Path>,
+    {
+        let src = src.as_ref();
+        let dst = dst.as_ref();
+
+        let src_str = src.to_string_lossy().to_string();
+        let mut remote_file = sftp
+            .open_with_flags(&src_str, OpenFlags::READ)
+            .await
+            .map_err(|e| Error::OpenRemoteFile { path: src_str, source: e })?;
+
+        let mut local_file =
+            LocalFile::create(dst).await.context(error::OpenLocalFileSnafu { path: dst })?;
+
+        let mut buffer = vec![0; 16384];
+        while let Ok(n) = remote_file.read(&mut buffer).await {
+            if n == 0 {
+                break;
+            }
+            local_file
+                .write_all(&buffer[..n])
+                .await
+                .context(error::TransferDataSnafu { path: dst })?;
+        }
+
+        Ok(())
     }
 
     pub async fn close(self) -> Result<(), Error> {

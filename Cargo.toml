@@ -55,8 +55,8 @@ shadow-rs     = "1.7"
 shell-escape  = "0.1"
 snafu         = "0.8"
 
-russh   = "0.57"
-ssh-key = "0.6"
+russh      = "0.57"
+russh-sftp = "2"
 
 axon-base = { path = "./crates/base" }
 axon-cli  = { path = "./crates/cli" }
