@@ -73,13 +73,19 @@ pub enum Commands {
     #[command(alias = "a", about = "Attach to a pod in a specific namespace")]
     Attach(AttachCommand),
 
-    #[command(alias = "e", about = "Execute command on a pod in a specific namespace")]
+    #[command(
+        aliases = ["e", "exec"],
+        about = "Execute command on a pod in a specific namespace"
+    )]
     Execute(ExecuteCommand),
 
     #[command(alias = "l", about = "List all pods created by axon")]
     List(ListCommand),
 
-    #[command(alias = "p", about = "Forward one or more local ports to a pod")]
+    #[command(
+        aliases = ["p", "pf"],
+        about = "Forward one or more local ports to a pod"
+    )]
     PortForward(PortForwardCommand),
 
     #[command(alias = "i", about = "Manage images")]
@@ -180,8 +186,6 @@ impl Cli {
                     return Ok(-1);
                 }
             }
-
-            println!("========= finished");
 
             Ok(0)
         };

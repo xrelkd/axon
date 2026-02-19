@@ -1,13 +1,16 @@
 mod error;
 
-use futures::{SinkExt, channel::mpsc::Sender};
+use futures::{FutureExt, SinkExt, channel::mpsc::Sender};
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     Api,
     api::{AttachParams, TerminalSize},
 };
 use snafu::{OptionExt, ResultExt};
-use tokio::{io::AsyncWriteExt, signal};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    signal,
+};
 
 pub use self::error::Error;
 use crate::ui::terminal::TerminalRawModeGuard;
@@ -40,6 +43,7 @@ impl PodConsole {
     }
 
     pub async fn run(self) -> Result<(), Error> {
+        let _raw_mode_guard = TerminalRawModeGuard::setup()?;
         let Self { api, pod_name, namespace, shell } = self;
 
         // Initiate Exec
@@ -63,47 +67,57 @@ impl PodConsole {
 
         // Handle Terminal Resizing
         let cancel_token = tokio_util::sync::CancellationToken::new();
-        let mut terminal_size_handle = {
-            let term_tx = attached.terminal_size().context(error::GetTerminalSizeWriterSnafu)?;
-            tokio::spawn(handle_terminal_size(term_tx, cancel_token.clone()))
-        };
+        let term_tx = attached.terminal_size().context(error::GetTerminalSizeWriterSnafu)?;
+        let mut terminal_size_handle =
+            tokio::spawn(handle_terminal_size(term_tx, cancel_token.clone()));
 
-        {
-            // Extract Streams
-            let pod_stdout =
-                attached.stdout().context(error::GetPodStreamSnafu { stream: "stdout" })?;
-            let pod_stdin =
-                attached.stdin().context(error::GetPodStreamSnafu { stream: "stdin" })?;
+        let mut pod_stdout =
+            attached.stdout().context(error::GetPodStreamSnafu { stream: "stdout" })?;
+        let mut pod_stdin =
+            attached.stdin().context(error::GetPodStreamSnafu { stream: "stdin" })?;
 
-            let _raw_mode_guard = TerminalRawModeGuard::setup()?;
+        let mut local_stdin = tokio_fd::AsyncFd::try_from(0)
+            .context(error::InitializeStdioSnafu { stream: "stdin" })?;
+        let mut local_stdout = tokio_fd::AsyncFd::try_from(1)
+            .context(error::InitializeStdioSnafu { stream: "stdout" })?;
 
-            // Bidirectional Copy
-            let mut pod_combined = tokio::io::join(pod_stdout, pod_stdin);
-            let mut local_combined = tokio::io::join(tokio::io::stdin(), tokio::io::stdout());
+        let mut in_buffer = vec![0u8; 4096];
+        let mut out_buffer = vec![0u8; 4096];
 
+        let mut attached_join = attached.join().fuse().boxed();
+
+        loop {
             tokio::select! {
-                result = tokio::io::copy_bidirectional(&mut local_combined, &mut pod_combined) => {
-                    if let Err(err) = result && err.kind() != std::io::ErrorKind::BrokenPipe {
-                        return Err(err).context(error::CopyBidirectionalIoSnafu);
+                _ = &mut attached_join => {
+                    tracing::debug!("Pod connection closed by remote.");
+                    break;
+                },
+                res = local_stdin.read(&mut in_buffer) => {
+                    match res {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => {
+                            pod_stdin.write_all(&in_buffer[..n]).await.context(error::CopyIoSnafu)?;
+                            pod_stdin.flush().await.context(error::CopyIoSnafu)?;
+                        }
                     }
                 },
-                result = &mut terminal_size_handle => {
-                    match result {
-                        Ok(_) => tracing::info!("End of terminal size stream"),
-                        Err(err) => tracing::warn!("Error getting terminal size: {err}")
+                res = pod_stdout.read(&mut out_buffer) => {
+                    match res {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => {
+                            local_stdout.write_all(&out_buffer[..n]).await.context(error::CopyIoSnafu)?;
+                            local_stdout.flush().await.context(error::CopyIoSnafu)?;
+                        }
                     }
                 },
+                res = &mut terminal_size_handle => {
+                    tracing::debug!("Terminal size task finished: {:?}", res);
+                    break;
+                }
             }
-            let _unused = local_combined.shutdown().await;
-            let _unused = pod_combined.shutdown().await;
         }
 
-        let _unused = attached.join().await;
-
-        // Cleanup
         cancel_token.cancel();
-        drop(cancel_token);
-
         let _unused = terminal_size_handle.await;
 
         Ok(())

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use snafu::Snafu;
 
 #[derive(Debug, Snafu)]
@@ -14,11 +16,14 @@ pub enum Error {
         source: Box<kube::Error>,
     },
 
-    #[snafu(display("Error occurs while copying I/O bidirectionally, error: {source}"))]
-    CopyBidirectionalIo { source: std::io::Error },
+    #[snafu(display("Failed to initialize standard I/O streams ({stream}), error: {source}"))]
+    InitializeStdio { stream: Cow<'static, str>, source: std::io::Error },
+
+    #[snafu(display("Error occurs while copying I/O, error: {source}"))]
+    CopyIo { source: std::io::Error },
 
     #[snafu(display("{stream} requested but missing"))]
-    GetPodStream { stream: &'static str },
+    GetPodStream { stream: Cow<'static, str> },
 
     #[snafu(display("Failed to get terminal size, error: {source}"))]
     GetTerminalSize { source: std::io::Error },
