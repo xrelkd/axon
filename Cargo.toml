@@ -54,6 +54,7 @@ resolve-path  = "0.1"
 semver        = "1"
 shadow-rs     = "1.7"
 shell-escape  = "0.1"
+skim          = "0.20"
 snafu         = "0.8"
 
 russh      = "0.57"

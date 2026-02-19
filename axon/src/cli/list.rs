@@ -41,9 +41,8 @@ impl ListCommand {
                 .context(error::ListPodsWithNamespaceSnafu { namespace })?
         };
 
-        let _ = tokio::io::stdout().write_all(pods.render_table().as_bytes()).await.ok();
-        let _ = tokio::io::stdout().write_u8(b'\n').await.ok();
-
-        Ok(())
+        let mut stdout = tokio::io::stdout();
+        stdout.write_all(pods.render_table().as_bytes()).await.context(error::WriteStdoutSnafu)?;
+        stdout.write_u8(b'\n').await.context(error::WriteStdoutSnafu)
     }
 }

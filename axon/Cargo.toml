@@ -39,6 +39,7 @@ indicatif     = { workspace = true }
 resolve-path  = { workspace = true }
 shadow-rs     = { workspace = true }
 shell-escape  = { workspace = true }
+skim          = { workspace = true }
 snafu         = { workspace = true }
 
 russh      = { workspace = true }
@@ -53,4 +54,4 @@ k8s-openapi = { workspace = true }
 shadow-rs = { workspace = true }
 
 [lints]
-workspace = true
+# workspace = true
