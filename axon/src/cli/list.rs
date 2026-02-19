@@ -6,7 +6,11 @@ use snafu::ResultExt;
 use tokio::io::AsyncWriteExt;
 
 use crate::{
-    cli::{error, error::Error},
+    cli::{
+        error::{self, Error},
+        internal::{ResolvedResources, ResourceResolver},
+    },
+    config::Config,
     ui::table::PodListExt,
 };
 
@@ -29,12 +33,12 @@ pub struct ListCommand {
 }
 
 impl ListCommand {
-    pub async fn run(self, kube_client: kube::Client) -> Result<(), Error> {
+    pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
         let Self { namespace, all_namespaces } = self;
 
-        let namespace = namespace
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| kube_client.default_namespace().to_string());
+        // Resolve Identity
+        let ResolvedResources { namespace, .. } =
+            ResourceResolver::from((&kube_client, &config)).resolve(namespace, None);
 
         let list_params = ListParams {
             label_selector: Some(format!("{}={PROJECT_NAME}", labels::MANAGED_BY)),

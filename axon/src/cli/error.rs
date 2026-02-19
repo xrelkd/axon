@@ -95,9 +95,6 @@ pub enum Error {
         source: Box<kube::Error>,
     },
 
-    #[snafu(display("No SSH private key is provided"))]
-    NoSshPrivateKeyProvided,
-
     #[snafu(display("Failed to serialize interactive shell configuration, error: {source}"))]
     SerializeInteractiveShell { source: serde_json::Error },
 }

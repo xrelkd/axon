@@ -8,12 +8,13 @@ use sigfinn::{ExitStatus, LifecycleManager};
 use crate::{
     cli::{
         Error, error,
-        internal::ApiPodExt,
-        ssh::internal::{Configurator, DEFAULT_SSH_PORT, FileTransfer, FileTransferRunner},
+        internal::{ApiPodExt, ResolvedResources, ResourceResolver},
+        ssh::internal::{
+            Configurator, DEFAULT_SSH_PORT, FileTransfer, FileTransferRunner, setup_port_forwarding,
+        },
     },
     config::Config,
     ext::PodExt,
-    port_forwarder::PortForwarderBuilder,
     ssh,
 };
 
@@ -78,26 +79,12 @@ impl PutCommand {
             destination,
         } = self;
 
-        let (ssh_private_key, ssh_public_key) = {
-            let private_key = {
-                let ((Some(private_key_file), _) | (None, Some(private_key_file))) =
-                    (ssh_private_key_file, config.ssh_private_key_file_path)
-                else {
-                    return error::NoSshPrivateKeyProvidedSnafu.fail();
-                };
-                ssh::load_secret_key(private_key_file, None).await?
-            };
+        // Resolve Identity
+        let ResolvedResources { namespace, pod_name } =
+            ResourceResolver::from((&kube_client, &config)).resolve(namespace, pod_name);
 
-            let public_key =
-                private_key.public_key().to_openssh().expect("SSH public key should be valid");
-            (private_key, public_key)
-        };
-
-        let namespace = namespace
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| kube_client.default_namespace().to_string());
-        let pod_name =
-            pod_name.filter(|s| !s.is_empty()).unwrap_or_else(|| config.default_pod_name.clone());
+        let (ssh_private_key, ssh_public_key) =
+            ssh::load_ssh_key_pair(ssh_private_key_file, config.ssh_private_key_file_path).await?;
 
         let api = Api::<Pod>::namespaced(kube_client, &namespace);
         let pod = api
@@ -110,27 +97,9 @@ impl PutCommand {
             .await?;
 
         let lifecycle_manager = LifecycleManager::<Error>::new();
-
-        let (handle, ssh_local_socket_addr_receiver) = {
-            let (sender, receiver) = tokio::sync::oneshot::channel();
-            let on_ready = move |socket_addr| {
-                let _unused = sender.send(socket_addr);
-            };
-            let handle =
-                lifecycle_manager.spawn("port-forwarder", move |shutdown_signal| async move {
-                    let result = PortForwarderBuilder::new(api, pod_name, remote_port)
-                        .on_ready(on_ready)
-                        .build()
-                        .run(shutdown_signal)
-                        .await;
-                    match result {
-                        Ok(()) => ExitStatus::Success,
-                        Err(err) => ExitStatus::Error(Error::from(err)),
-                    }
-                });
-            (handle, receiver)
-        };
-
+        let handle = lifecycle_manager.handle();
+        let ssh_local_socket_addr_receiver =
+            setup_port_forwarding(api, pod_name, remote_port, &handle);
         let _handle = lifecycle_manager.spawn("ssh-client", move |shutdown_signal| async move {
             let socket_addr = match ssh_local_socket_addr_receiver.await {
                 Ok(a) => a,

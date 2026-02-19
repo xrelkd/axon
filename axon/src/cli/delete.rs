@@ -9,7 +9,11 @@ use kube::{
 use snafu::ResultExt;
 
 use crate::{
-    cli::error::{self, Error},
+    cli::{
+        error::{self, Error},
+        internal::{ResolvedResources, ResourceResolver},
+    },
+    config::Config,
     ui::fuzzy_finder::PodListExt as _,
 };
 
@@ -34,14 +38,14 @@ pub struct DeleteCommand {
 }
 
 impl DeleteCommand {
-    pub async fn run(self, kube_client: kube::Client) -> Result<(), Error> {
+    pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
         let Self { namespace, pod_names } = self;
 
-        let namespace = namespace
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| kube_client.default_namespace().to_string());
-        let api = Api::<Pod>::namespaced(kube_client, &namespace);
+        // Resolve Identity
+        let ResolvedResources { namespace, .. } =
+            ResourceResolver::from((&kube_client, &config)).resolve(namespace, None);
 
+        let api = Api::<Pod>::namespaced(kube_client, &namespace);
         let pod_names = if pod_names.is_empty() {
             let list_params = ListParams {
                 label_selector: Some(format!("{}={PROJECT_NAME}", labels::MANAGED_BY)),

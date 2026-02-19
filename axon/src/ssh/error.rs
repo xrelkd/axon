@@ -8,6 +8,9 @@ pub enum Error {
     #[snafu(display("Operation has been cancelled"))]
     Cancelled,
 
+    #[snafu(display("No SSH private key is provided"))]
+    NoSshPrivateKeyProvided,
+
     #[snafu(display("Failed to read the local SSH private key file {}, error: {source}", file_path.display()))]
     ReadSshPrivateKey { file_path: PathBuf, source: std::io::Error },
 

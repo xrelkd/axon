@@ -1,3 +1,10 @@
+//! Kubernetes Pod Interactive Console.
+//!
+//! This module provides the ability to attach to a running Pod's container and
+//! interact with it via a terminal-like interface. It handles raw mode terminal
+//! settings, standard I/O streaming, and dynamic terminal window resizing
+//! (SIGWINCH).
+
 mod error;
 
 use futures::{FutureExt, SinkExt, channel::mpsc::Sender};
@@ -15,6 +22,12 @@ use tokio::{
 pub use self::error::Error;
 use crate::ui::terminal::TerminalRawModeGuard;
 
+/// A controller for managing an interactive terminal session with a Kubernetes
+/// Pod.
+///
+/// `PodConsole` encapsulates the logic required to establish a TTY connection
+/// to a specific Pod and synchronize local terminal input/output with the
+/// remote container.
 #[derive(Clone, Debug)]
 pub struct PodConsole {
     api: Api<Pod>,
@@ -24,6 +37,19 @@ pub struct PodConsole {
 }
 
 impl PodConsole {
+    /// Creates a new `PodConsole` instance.
+    ///
+    /// # Arguments
+    /// * `api` - The Kubernetes API client for Pods.
+    /// * `pod_name` - The name of the target Pod.
+    /// * `namespace` - The namespace where the Pod is located.
+    /// * `shell` - An iterator of strings representing the command to run
+    ///   (e.g., `["/bin/sh"]`).
+    ///
+    /// # Example
+    /// ```rust
+    /// let console = PodConsole::new(api, "my-pod", "default", vec!["/bin/bash"]);
+    /// ```
     pub fn new<I, S>(
         api: Api<Pod>,
         pod_name: impl Into<String>,
@@ -42,6 +68,18 @@ impl PodConsole {
         }
     }
 
+    /// Executes the interactive session.
+    ///
+    /// This method sets the local terminal to raw mode, connects to the Pod,
+    /// and pipes I/O between the local terminal and the remote container.
+    /// It also spawns a background task to handle terminal window resizing.
+    ///
+    /// # Errors
+    /// Returns an [`Error`] if:
+    /// * The local terminal fails to enter raw mode.
+    /// * The connection to the Kubernetes API fails.
+    /// * Standard I/O streams cannot be initialized or accessed.
+    /// * There is an I/O error during the data transfer.
     pub async fn run(self) -> Result<(), Error> {
         let _raw_mode_guard = TerminalRawModeGuard::setup()?;
         let Self { api, pod_name, namespace, shell } = self;
@@ -124,7 +162,15 @@ impl PodConsole {
     }
 }
 
-// Send the new terminal size to channel when it change
+/// Monitors for terminal resize events and notifies the Kubernetes API.
+///
+/// This function listens for the `SIGWINCH` signal on Unix systems. When the
+/// terminal is resized, it fetches the new dimensions and sends them through
+/// the provided channel to update the remote container's TTY size.
+///
+/// # Errors
+/// Returns an [`Error`] if the signal stream cannot be created or if sending
+/// the new size over the channel fails.
 async fn handle_terminal_size(
     mut channel: Sender<TerminalSize>,
     cancel_token: tokio_util::sync::CancellationToken,

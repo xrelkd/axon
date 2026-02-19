@@ -181,11 +181,11 @@ impl Cli {
                     return Ok(0);
                 }
                 Some(Commands::Create(cmd)) => cmd.run(kube_client, config).boxed().await?,
-                Some(Commands::Delete(cmd)) => cmd.run(kube_client).await?,
-                Some(Commands::List(cmd)) => cmd.run(kube_client).await?,
+                Some(Commands::List(cmd)) => cmd.run(kube_client, config).await?,
                 Some(Commands::Attach(cmd)) => cmd.run(kube_client, config).await?,
                 Some(Commands::Execute(cmd)) => cmd.run(kube_client, config).await?,
                 Some(Commands::PortForward(cmd)) => cmd.run(kube_client, config).await?,
+                Some(Commands::Delete(cmd)) => cmd.run(kube_client, config).await?,
                 Some(Commands::Image { commands }) => commands.run(config).await?,
                 Some(Commands::Ssh { commands }) => commands.run(kube_client, config).await?,
                 _ => {

@@ -20,7 +20,7 @@ impl PodExt for Pod {
         {
             shell
         } else {
-            consts::DEFAULT_INTERACTIVE_SHELL.iter().map(ToString::to_string).collect()
+            consts::DEFAULT_INTERACTIVE_SHELL.clone()
         }
     }
 

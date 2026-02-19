@@ -13,7 +13,10 @@ use kube::{
 use snafu::{OptionExt, ResultExt};
 
 use crate::{
-    cli::{Error, error, internal::ApiPodExt},
+    cli::{
+        Error, error,
+        internal::{ApiPodExt, ResolvedResources, ResourceResolver},
+    },
     config::{Config, ImagePullPolicy, PortMapping, ServicePorts, Spec},
     pod_console::PodConsole,
 };
@@ -61,11 +64,10 @@ pub struct CreateCommand {
 impl CreateCommand {
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
         let Self { namespace, pod_name, auto_attach, timeout_secs, mode } = self;
-        let namespace = namespace
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| kube_client.default_namespace().to_string());
-        let pod_name =
-            pod_name.filter(|s| !s.is_empty()).unwrap_or_else(|| config.default_pod_name.clone());
+
+        // Resolve Identity
+        let ResolvedResources { namespace, pod_name } =
+            ResourceResolver::from((&kube_client, &config)).resolve(namespace, pod_name);
 
         let target = match mode {
             None | Some(Mode::Default) => config.find_default_spec(),
@@ -92,7 +94,7 @@ impl CreateCommand {
         };
 
         let interactive_shell = if target.interactive_shell.is_empty() {
-            DEFAULT_INTERACTIVE_SHELL.iter().map(ToString::to_string).collect()
+            DEFAULT_INTERACTIVE_SHELL.clone()
         } else {
             target.interactive_shell.clone()
         };

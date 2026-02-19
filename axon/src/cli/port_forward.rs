@@ -6,7 +6,10 @@ use kube::Api;
 use sigfinn::{ExitStatus, LifecycleManager};
 
 use crate::{
-    cli::{Error, internal::ApiPodExt},
+    cli::{
+        Error,
+        internal::{ApiPodExt, ResolvedResources, ResourceResolver},
+    },
     config::{Config, PortMapping},
     ext::PodExt,
     port_forwarder::PortForwarderBuilder,
@@ -43,11 +46,9 @@ impl PortForwardCommand {
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
         let Self { namespace, pod_name, timeout_secs } = self;
 
-        let namespace = namespace
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| kube_client.default_namespace().to_string());
-        let pod_name =
-            pod_name.filter(|s| !s.is_empty()).unwrap_or_else(|| config.default_pod_name.clone());
+        // Resolve Identity
+        let ResolvedResources { namespace, pod_name } =
+            ResourceResolver::from((&kube_client, &config)).resolve(namespace, pod_name);
 
         let api = Api::<Pod>::namespaced(kube_client, &namespace);
         let port_mappings = api

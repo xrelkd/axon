@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 pub mod k8s {
     pub mod labels {
         pub const NAME: &str = "app.kubernetes.io/name";
@@ -25,4 +27,5 @@ pub mod k8s {
 
 pub const DEFAULT_POD_NAME: &str = "axon";
 pub const DEFAULT_IMAGE: &str = "docker.io/alpine:3.23";
-pub const DEFAULT_INTERACTIVE_SHELL: [&str; 1] = ["/bin/sh"];
+pub static DEFAULT_INTERACTIVE_SHELL: LazyLock<Vec<String>> =
+    LazyLock::new(|| vec!["/bin/sh".to_string()]);

@@ -5,7 +5,11 @@ use k8s_openapi::api::core::v1::Pod;
 use kube::Api;
 
 use crate::{
-    cli::{Error, error, internal::ApiPodExt, ssh::internal::Configurator},
+    cli::{
+        Error,
+        internal::{ApiPodExt, ResolvedResources, ResourceResolver},
+        ssh::internal::Configurator,
+    },
     config::Config,
     ssh,
 };
@@ -49,20 +53,11 @@ pub struct SetupCommand {
 impl SetupCommand {
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
         let Self { namespace, pod_name, timeout_secs, ssh_private_key_file } = self;
-        let ssh_public_key = {
-            let ((Some(ssh_private_key_file), _) | (None, Some(ssh_private_key_file))) =
-                (ssh_private_key_file, config.ssh_private_key_file_path)
-            else {
-                return error::NoSshPrivateKeyProvidedSnafu.fail();
-            };
-            ssh::load_public_key_from_secret_key_file(&ssh_private_key_file, None).await?
-        };
+        let (_, ssh_public_key) = ssh::load_ssh_key_pair(ssh_private_key_file, None).await?;
 
-        let namespace = namespace
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| kube_client.default_namespace().to_string());
-        let pod_name =
-            pod_name.filter(|s| !s.is_empty()).unwrap_or_else(|| config.default_pod_name.clone());
+        // Resolve Identity
+        let ResolvedResources { namespace, pod_name } =
+            ResourceResolver::from((&kube_client, &config)).resolve(namespace, pod_name);
 
         let api = Api::<Pod>::namespaced(kube_client, &namespace);
         let _unused = api
