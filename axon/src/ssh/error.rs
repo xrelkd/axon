@@ -5,6 +5,9 @@ use snafu::Snafu;
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum Error {
+    #[snafu(display("Operation has been cancelled"))]
+    Cancelled,
+
     #[snafu(display("Failed to read the local SSH private key file {}, error: {source}", file_path.display()))]
     ReadSshPrivateKey { file_path: PathBuf, source: std::io::Error },
 

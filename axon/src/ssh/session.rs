@@ -1,5 +1,6 @@
 use std::{path::Path, sync::Arc, time::Duration};
 
+use futures::{FutureExt, future};
 use russh::{
     ChannelMsg, Disconnect, client,
     keys::{PrivateKey, PublicKey, key::PrivateKeyWithHashAlg},
@@ -8,9 +9,10 @@ use russh_sftp::{client::SftpSession, protocol::OpenFlags};
 use snafu::{IntoError, ResultExt};
 use tokio::{
     fs::File as LocalFile,
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     net::ToSocketAddrs,
 };
+use tokio_util::either::Either as AsyncEither;
 
 use crate::ssh::{error, error::Error};
 
@@ -124,10 +126,21 @@ impl Session {
         Ok(code)
     }
 
-    pub async fn upload<S, D>(&self, src: S, dst: D) -> Result<u64, Error>
+    pub async fn upload<S, D, L, R, F, Sig>(
+        &self,
+        src: S,
+        dst: D,
+        on_length: Option<L>,
+        reader_wrapper: Option<F>,
+        cancel_signal: Option<Sig>,
+    ) -> Result<u64, Error>
     where
         S: AsRef<Path>,
         D: AsRef<Path>,
+        L: FnOnce(u64),
+        R: AsyncRead + Send + Unpin,
+        F: FnOnce(LocalFile) -> R,
+        Sig: Future<Output = ()> + Unpin,
     {
         let src = src.as_ref();
         let dst = dst.as_ref();
@@ -135,62 +148,110 @@ impl Session {
         let local_file =
             LocalFile::open(src).await.context(error::OpenLocalFileSnafu { path: src })?;
 
-        // Get file size for progress bar
-        let metadata =
-            local_file.metadata().await.context(error::OpenLocalFileSnafu { path: src })?;
+        if let Some(on_length) = on_length {
+            let _unused = local_file
+                .metadata()
+                .await
+                .inspect(|metadata| {
+                    on_length(metadata.len());
+                })
+                .context(error::OpenLocalFileSnafu { path: src })?;
+        }
 
         let dst_str = dst.to_string_lossy().to_string();
-
         let sftp = self.prepare_sftp_session().await?;
+
         let mut remote_file = sftp
             .open_with_flags(&dst_str, OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE)
             .await
             .map_err(|source| Error::OpenRemoteFile { path: dst_str, source })?;
 
-        let pb = create_progress_bar(metadata.len(), "Uploading");
+        // Wrap reader if provided
+        let mut local_file = match reader_wrapper {
+            Some(wrapper) => AsyncEither::Left(wrapper(local_file)),
+            None => AsyncEither::Right(local_file),
+        };
 
-        let mut local_file = pb.wrap_async_read(local_file);
-        let n = tokio::io::copy(&mut local_file, &mut remote_file)
-            .await
-            .context(error::TransferDataSnafu { path: src })?;
+        // Create the copy future
+        let copy_task = tokio::io::copy(&mut local_file, &mut remote_file).boxed();
+
+        let n = match cancel_signal {
+            Some(sig) => match future::select(copy_task, sig).await {
+                future::Either::Left((copy_res, _)) => {
+                    copy_res.context(error::TransferDataSnafu { path: src })?
+                }
+                future::Either::Right((..)) => return Err(Error::Cancelled),
+            },
+            None => copy_task.await.context(error::TransferDataSnafu { path: src })?,
+        };
+
         let _ = remote_file.shutdown().await.ok();
-
-        pb.finish_with_message("Upload complete");
-
         Ok(n)
     }
 
-    pub async fn download<S, D>(&self, src: S, dst: D) -> Result<u64, Error>
+    pub async fn download<S, D, L, R, F, Sig>(
+        &self,
+        src: S,
+        dst: D,
+        on_length: Option<L>,
+        reader_wrapper: Option<F>,
+        cancel_signal: Option<Sig>,
+    ) -> Result<u64, Error>
     where
         S: AsRef<Path>,
         D: AsRef<Path>,
+        R: AsyncRead + Send + Unpin,
+        L: FnOnce(u64),
+        F: FnOnce(russh_sftp::client::fs::File) -> R,
+        Sig: Future<Output = ()> + Unpin,
     {
         let src = src.as_ref();
         let dst = dst.as_ref();
-
         let src_str = src.to_string_lossy().to_string();
 
         let sftp = self.prepare_sftp_session().await?;
+
+        // Open remote file for reading
         let remote_file = sftp
             .open_with_flags(&src_str, OpenFlags::READ)
             .await
             .with_context(|_| error::OpenRemoteFileSnafu { path: src_str.clone() })?;
 
-        // Get remote metadata for progress bar
-        let remote_meta = remote_file
-            .metadata()
-            .await
-            .with_context(|_| error::OpenRemoteFileSnafu { path: src_str.clone() })?;
-
+        // Create local file
         let mut local_file =
             LocalFile::create(dst).await.context(error::OpenLocalFileSnafu { path: dst })?;
 
-        let pb = create_progress_bar(remote_meta.len(), "Downloading");
-        let mut remote_file = pb.wrap_async_read(remote_file);
-        let n = tokio::io::copy(&mut remote_file, &mut local_file)
-            .await
-            .context(error::TransferDataSnafu { path: dst })?;
-        pb.finish_with_message("Download complete");
+        if let Some(on_length) = on_length {
+            let _unused = remote_file
+                .metadata()
+                .await
+                .inspect(|metadata| {
+                    on_length(metadata.len());
+                })
+                .context(error::OpenRemoteFileSnafu { path: src_str.clone() })?;
+        }
+
+        // Wrap writer if provided (similar to reader_wrapper in upload)
+        let mut remote_file = match reader_wrapper {
+            Some(wrapper) => AsyncEither::Left(wrapper(remote_file)),
+            None => AsyncEither::Right(remote_file),
+        };
+
+        // Create the copy future
+        let copy_task = tokio::io::copy(&mut remote_file, &mut local_file).boxed();
+
+        let n = match cancel_signal {
+            Some(sig) => match future::select(copy_task, sig).await {
+                future::Either::Left((copy_res, _)) => {
+                    copy_res.context(error::TransferDataSnafu { path: dst })?
+                }
+                future::Either::Right((..)) => return Err(Error::Cancelled),
+            },
+            None => copy_task.await.context(error::TransferDataSnafu { path: dst })?,
+        };
+
+        // Ensure data is flushed to disk
+        let _ = local_file.shutdown().await.ok();
 
         Ok(n)
     }
@@ -209,19 +270,4 @@ impl Session {
 
         SftpSession::new(channel.into_stream()).await.with_context(|_| error::OpenSftpSessionSnafu)
     }
-}
-
-fn create_progress_bar(len: u64, msg: &'static str) -> indicatif::ProgressBar {
-    let pb = indicatif::ProgressBar::new(len);
-    pb.set_style(
-        indicatif::ProgressStyle::default_bar()
-            .template(
-                "{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] \
-                 {bytes}/{total_bytes} ({eta}) {msg}",
-            )
-            .unwrap()
-            .progress_chars("#>-"),
-    );
-    pb.set_message(msg);
-    pb
 }
