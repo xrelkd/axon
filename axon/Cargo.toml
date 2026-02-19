@@ -35,6 +35,7 @@ clap_complete = { workspace = true }
 comfy-table   = { workspace = true }
 crossterm     = { workspace = true }
 directories   = { workspace = true }
+indicatif     = { workspace = true }
 resolve-path  = { workspace = true }
 shadow-rs     = { workspace = true }
 shell-escape  = { workspace = true }

@@ -132,8 +132,12 @@ impl Session {
         let src = src.as_ref();
         let dst = dst.as_ref();
 
-        let mut local_file =
+        let local_file =
             LocalFile::open(src).await.context(error::OpenLocalFileSnafu { path: src })?;
+
+        // Get file size for progress bar
+        let metadata =
+            local_file.metadata().await.context(error::OpenLocalFileSnafu { path: src })?;
 
         let dst_str = dst.to_string_lossy().to_string();
 
@@ -143,10 +147,16 @@ impl Session {
             .await
             .map_err(|source| Error::OpenRemoteFile { path: dst_str, source })?;
 
+        let pb = create_progress_bar(metadata.len(), "Uploading");
+
+        let mut local_file = pb.wrap_async_read(local_file);
         let n = tokio::io::copy(&mut local_file, &mut remote_file)
             .await
             .context(error::TransferDataSnafu { path: src })?;
         let _ = remote_file.shutdown().await.ok();
+
+        pb.finish_with_message("Upload complete");
+
         Ok(n)
     }
 
@@ -161,17 +171,28 @@ impl Session {
         let src_str = src.to_string_lossy().to_string();
 
         let sftp = self.prepare_sftp_session().await?;
-        let mut remote_file = sftp
+        let remote_file = sftp
             .open_with_flags(&src_str, OpenFlags::READ)
             .await
-            .map_err(|e| Error::OpenRemoteFile { path: src_str, source: e })?;
+            .with_context(|_| error::OpenRemoteFileSnafu { path: src_str.clone() })?;
+
+        // Get remote metadata for progress bar
+        let remote_meta = remote_file
+            .metadata()
+            .await
+            .with_context(|_| error::OpenRemoteFileSnafu { path: src_str.clone() })?;
 
         let mut local_file =
             LocalFile::create(dst).await.context(error::OpenLocalFileSnafu { path: dst })?;
 
-        tokio::io::copy(&mut remote_file, &mut local_file)
+        let pb = create_progress_bar(remote_meta.len(), "Downloading");
+        let mut remote_file = pb.wrap_async_read(remote_file);
+        let n = tokio::io::copy(&mut remote_file, &mut local_file)
             .await
-            .context(error::TransferDataSnafu { path: dst })
+            .context(error::TransferDataSnafu { path: dst })?;
+        pb.finish_with_message("Download complete");
+
+        Ok(n)
     }
 
     pub async fn close(self) -> Result<(), Error> {
@@ -188,4 +209,19 @@ impl Session {
 
         SftpSession::new(channel.into_stream()).await.with_context(|_| error::OpenSftpSessionSnafu)
     }
+}
+
+fn create_progress_bar(len: u64, msg: &'static str) -> indicatif::ProgressBar {
+    let pb = indicatif::ProgressBar::new(len);
+    pb.set_style(
+        indicatif::ProgressStyle::default_bar()
+            .template(
+                "{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] \
+                 {bytes}/{total_bytes} ({eta}) {msg}",
+            )
+            .unwrap()
+            .progress_chars("#>-"),
+    );
+    pb.set_message(msg);
+    pb
 }

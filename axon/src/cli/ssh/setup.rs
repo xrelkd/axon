@@ -5,9 +5,8 @@ use k8s_openapi::api::core::v1::Pod;
 use kube::Api;
 
 use crate::{
-    cli::{Error, error, ssh::internal::SshConfigurator},
+    cli::{Error, error, internal::ApiPodExt, ssh::internal::Configurator},
     config::Config,
-    ext::ApiPodExt,
     ssh,
 };
 
@@ -54,6 +53,6 @@ impl SetupCommand {
             .await_running_status(&pod_name, &namespace, Duration::from_secs(timeout_secs))
             .await?;
 
-        SshConfigurator::new(api, namespace, pod_name).upload_ssh_key(ssh_public_key).await
+        Configurator::new(api, namespace, pod_name).upload_ssh_key(ssh_public_key).await
     }
 }

@@ -6,9 +6,9 @@ use kube::Api;
 use sigfinn::{ExitStatus, LifecycleManager};
 
 use crate::{
-    cli::Error,
+    cli::{Error, internal::ApiPodExt},
     config::{Config, PortMapping},
-    ext::{ApiPodExt, PodExt},
+    ext::PodExt,
     port_forwarder::PortForwarderBuilder,
 };
 

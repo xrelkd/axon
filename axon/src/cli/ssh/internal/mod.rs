@@ -3,7 +3,7 @@ mod handle_guard;
 mod transfer;
 
 pub use self::{
-    configurator::SshConfigurator,
+    configurator::Configurator,
     handle_guard::HandleGuard,
     transfer::{Transfer, TransferRunner},
 };

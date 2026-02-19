@@ -49,6 +49,7 @@ clap_complete = "4"
 comfy-table   = { version = "7" }
 crossterm     = "0.29"
 directories   = "6"
+indicatif     = { version = "0.18", features = ["tokio"] }
 resolve-path  = "0.1"
 semver        = "1"
 shadow-rs     = "1.7"

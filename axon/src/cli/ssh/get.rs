@@ -8,10 +8,11 @@ use sigfinn::{ExitStatus, LifecycleManager};
 use crate::{
     cli::{
         Error, error,
-        ssh::internal::{DEFAULT_SSH_PORT, SshConfigurator, Transfer, TransferRunner},
+        internal::ApiPodExt,
+        ssh::internal::{Configurator, DEFAULT_SSH_PORT, Transfer, TransferRunner},
     },
     config::Config,
-    ext::{ApiPodExt, PodExt},
+    ext::PodExt,
     port_forwarder::PortForwarderBuilder,
     ssh,
 };
@@ -84,7 +85,7 @@ impl GetCommand {
             .await?;
         let remote_port = pod.service_ports().ssh.unwrap_or(DEFAULT_SSH_PORT);
 
-        SshConfigurator::new(api.clone(), &namespace, &pod_name)
+        Configurator::new(api.clone(), &namespace, &pod_name)
             .upload_ssh_key(ssh_public_key)
             .await?;
 

@@ -4,6 +4,7 @@ mod delete;
 pub mod error;
 mod execute;
 mod image;
+mod internal;
 mod list;
 mod port_forward;
 mod ssh;

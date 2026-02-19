@@ -6,13 +6,13 @@ use snafu::ResultExt;
 
 use crate::cli::{Error, error};
 
-pub struct SshConfigurator {
+pub struct Configurator {
     api: Api<Pod>,
     namespace: String,
     pod_name: String,
 }
 
-impl SshConfigurator {
+impl Configurator {
     pub fn new(api: Api<Pod>, namespace: impl Into<String>, pod_name: impl Into<String>) -> Self {
         Self { api, namespace: namespace.into(), pod_name: pod_name.into() }
     }

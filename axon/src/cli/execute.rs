@@ -4,7 +4,11 @@ use clap::Args;
 use k8s_openapi::api::core::v1::Pod;
 use kube::Api;
 
-use crate::{cli::Error, config::Config, ext::ApiPodExt, pod_console::PodConsole};
+use crate::{
+    cli::{Error, internal::ApiPodExt},
+    config::Config,
+    pod_console::PodConsole,
+};
 
 #[derive(Args, Clone)]
 pub struct ExecuteCommand {
