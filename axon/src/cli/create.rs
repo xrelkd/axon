@@ -1,6 +1,9 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, time::Duration};
 
-use axon_base::consts::k8s::{annotations, labels};
+use axon_base::consts::{
+    DEFAULT_INTERACTIVE_SHELL,
+    k8s::{annotations, labels},
+};
 use clap::{ArgAction, Args, Parser};
 use k8s_openapi::api::core::v1::{Container, ContainerPort, Pod, PodSpec};
 use kube::{
@@ -10,8 +13,9 @@ use kube::{
 use snafu::{OptionExt, ResultExt};
 
 use crate::{
-    cli::{Error, attach::AttachCommand, error},
+    cli::{Error, error, internal::ApiPodExt},
     config::{Config, ImagePullPolicy, PortMapping, ServicePorts, Spec},
+    pod_console::PodConsole,
 };
 
 #[derive(Args, Clone)]
@@ -34,6 +38,14 @@ pub struct CreateCommand {
     )]
     pub auto_attach: bool,
 
+    #[arg(
+        short = 't',
+        long = "timeout-seconds",
+        default_value = "90",
+        help = "The maximum time in seconds to wait before timing out"
+    )]
+    pub timeout_secs: u64,
+
     #[command(subcommand)]
     pub mode: Option<Mode>,
 }
@@ -41,7 +53,7 @@ pub struct CreateCommand {
 impl CreateCommand {
     #[allow(clippy::too_many_lines)]
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
-        let Self { namespace, pod_name, auto_attach, mode } = self;
+        let Self { namespace, pod_name, auto_attach, timeout_secs, mode } = self;
         let namespace = namespace
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| kube_client.default_namespace().to_string());
@@ -75,8 +87,14 @@ impl CreateCommand {
         let interactive_shell =
             (!target.interactive_shell.is_empty()).then_some(target.interactive_shell);
 
-        // Construct the Pod Manifest
-        let pod = {
+        // Apply to Cluster
+        let api = Api::<Pod>::namespaced(kube_client, &namespace);
+
+        let pod_exists = api.get(&pod_name).await.is_ok();
+        if pod_exists {
+            tracing::info!("pod/{pod_name} has been created in namespace {namespace}");
+        } else {
+            // Construct the Pod Manifest
             let image = Some(target.image);
             let command = (!target.command.is_empty()).then_some(target.command);
             let args = (!target.args.is_empty()).then_some(target.args);
@@ -98,7 +116,7 @@ impl CreateCommand {
             )]);
 
             let annotations = {
-                let shell_json = serde_json::Value::from(interactive_shell).to_string();
+                let shell_json = serde_json::Value::from(interactive_shell.clone()).to_string();
                 [
                     (annotations::SHELL_INTERACTIVE.to_string(), shell_json),
                     (annotations::VERSION.to_string(), "1.0.0".to_string()),
@@ -109,7 +127,7 @@ impl CreateCommand {
                 .collect::<BTreeMap<_, _>>()
             };
 
-            Pod {
+            let pod = Pod {
                 metadata: ObjectMeta {
                     name: Some(pod_name.clone()),
                     namespace: Some(namespace.clone()),
@@ -130,16 +148,8 @@ impl CreateCommand {
                     ..PodSpec::default()
                 }),
                 ..Pod::default()
-            }
-        };
+            };
 
-        // Apply to Cluster
-        let api = Api::<Pod>::namespaced(kube_client, &namespace);
-
-        let pod_exists = api.get(&pod_name).await.is_ok();
-        if pod_exists {
-            tracing::info!("pod/{pod_name} has been created in namespace {namespace}");
-        } else {
             let _resource =
                 api.create(&PostParams::default(), &pod).await.context(error::CreatePodSnafu {
                     pod_name: pod_name.clone(),
@@ -150,17 +160,19 @@ impl CreateCommand {
         }
 
         if auto_attach {
-            AttachCommand {
-                namespace: Some(namespace),
-                pod_name: Some(pod_name),
-                interactive_shell: Vec::new(),
-                timeout_secs: 30,
-            }
-            .run(api.into_client(), config)
-            .await?;
+            let _pod = api
+                .await_running_status(&pod_name, &namespace, Duration::from_secs(timeout_secs))
+                .await?;
+            let interactive_shell = interactive_shell.unwrap_or_else(|| {
+                DEFAULT_INTERACTIVE_SHELL.iter().map(ToString::to_string).collect()
+            });
+            PodConsole::new(api, pod_name, namespace, interactive_shell)
+                .attach()
+                .await
+                .map_err(Error::from)
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 }
 
@@ -196,7 +208,7 @@ pub enum Mode {
         #[arg(long = "shell", action = ArgAction::Append, default_value = "/bin/sh", help = "Interactive shell")]
         interactive_shell: Vec<String>,
 
-        #[arg(long = "ports", action = ArgAction::Append, help = "Ports")]
+        #[arg(long = "ports", action = ArgAction::Append, help = "Port mappings")]
         port_mappings: Vec<PortMapping>,
     },
 }
