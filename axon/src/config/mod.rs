@@ -1,3 +1,4 @@
+mod error;
 mod image_pull_policy;
 mod port_mapping;
 mod service_ports;
@@ -8,11 +9,11 @@ use std::path::{Path, PathBuf};
 use axon_base::PROJECT_NAME;
 use resolve_path::PathResolveExt;
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
+use snafu::ResultExt;
 
 pub use self::{
-    image_pull_policy::ImagePullPolicy, port_mapping::PortMapping, service_ports::ServicePorts,
-    spec::Spec,
+    error::Error, image_pull_policy::ImagePullPolicy, port_mapping::PortMapping,
+    service_ports::ServicePorts, spec::Spec,
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -77,16 +78,17 @@ impl Config {
         let mut config: Self = {
             let path =
                 path.as_ref().try_resolve().map(|path| path.to_path_buf()).with_context(|_| {
-                    ResolveFilePathSnafu { file_path: path.as_ref().to_path_buf() }
+                    error::ResolveFilePathSnafu { file_path: path.as_ref().to_path_buf() }
                 })?;
-            let data = std::fs::read(&path).context(OpenConfigSnafu { filename: path.clone() })?;
-            serde_yaml::from_slice(&data).context(ParseConfigSnafu { filename: path })?
+            let data =
+                std::fs::read(&path).context(error::OpenConfigSnafu { filename: path.clone() })?;
+            serde_yaml::from_slice(&data).context(error::ParseConfigSnafu { filename: path })?
         };
 
         config.log.file_path = match config.log.file_path.map(|path| {
             path.try_resolve()
                 .map(|path| path.to_path_buf())
-                .with_context(|_| ResolveFilePathSnafu { file_path: path.clone() })
+                .with_context(|_| error::ResolveFilePathSnafu { file_path: path.clone() })
         }) {
             Some(Ok(path)) => Some(path),
             Some(Err(err)) => return Err(err),
@@ -108,15 +110,3 @@ impl Config {
 fn default_pod_name() -> String { PROJECT_NAME.to_string() }
 
 fn default_spec() -> String { PROJECT_NAME.to_string() }
-
-#[derive(Debug, Snafu)]
-pub enum Error {
-    #[snafu(display("Could not open config from {}, error: {source}", filename.display()))]
-    OpenConfig { filename: PathBuf, source: std::io::Error },
-
-    #[snafu(display("Count not parse config from {}, error: {source}", filename.display()))]
-    ParseConfig { filename: PathBuf, source: serde_yaml::Error },
-
-    #[snafu(display("Could not resolve file path {}, error: {source}", file_path.display()))]
-    ResolveFilePath { file_path: PathBuf, source: std::io::Error },
-}
