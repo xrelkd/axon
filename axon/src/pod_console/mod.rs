@@ -7,7 +7,7 @@ use kube::{
     api::{AttachParams, TerminalSize},
 };
 use snafu::{OptionExt, ResultExt};
-use tokio::signal;
+use tokio::{io::AsyncWriteExt, signal};
 
 pub use self::error::Error;
 use crate::ui::terminal::TerminalRawModeGuard;
@@ -39,11 +39,8 @@ impl PodConsole {
         }
     }
 
-    pub async fn attach(self) -> Result<(), Error> {
+    pub async fn run(self) -> Result<(), Error> {
         let Self { api, pod_name, namespace, shell } = self;
-
-        // Setup Raw Mode Guard
-        let _raw_mode_guard = TerminalRawModeGuard::setup()?;
 
         // Initiate Exec
         let mut attached = api
@@ -64,39 +61,50 @@ impl PodConsole {
                 pod_name: pod_name.clone(),
             })?;
 
-        // Extract Streams
-        let pod_stdout =
-            attached.stdout().context(error::GetPodStreamSnafu { stream: "stdout" })?;
-        let pod_stdin = attached.stdin().context(error::GetPodStreamSnafu { stream: "stdin" })?;
-        let term_tx = attached.terminal_size().context(error::GetTerminalSizeWriterSnafu)?;
-
         // Handle Terminal Resizing
         let cancel_token = tokio_util::sync::CancellationToken::new();
-        let mut terminal_size_handle =
-            tokio::spawn(handle_terminal_size(term_tx, cancel_token.clone()));
+        let mut terminal_size_handle = {
+            let term_tx = attached.terminal_size().context(error::GetTerminalSizeWriterSnafu)?;
+            tokio::spawn(handle_terminal_size(term_tx, cancel_token.clone()))
+        };
 
-        // Bidirectional Copy
-        let mut pod_combined = tokio::io::join(pod_stdout, pod_stdin);
-        let mut local_combined = tokio::io::join(tokio::io::stdin(), tokio::io::stdout());
+        {
+            // Extract Streams
+            let pod_stdout =
+                attached.stdout().context(error::GetPodStreamSnafu { stream: "stdout" })?;
+            let pod_stdin =
+                attached.stdin().context(error::GetPodStreamSnafu { stream: "stdin" })?;
 
-        tokio::select! {
-            result = tokio::io::copy_bidirectional(&mut local_combined, &mut pod_combined) => {
-                if let Err(err) = result && err.kind() != std::io::ErrorKind::BrokenPipe {
-                    return Err(err).context(error::CopyBidirectionalIoSnafu);
-                }
-            },
-            result = &mut terminal_size_handle => {
-                match result {
-                    Ok(_) => tracing::info!("End of terminal size stream"),
-                    Err(err) => tracing::warn!("Error getting terminal size: {err}")
-                }
-            },
+            let _raw_mode_guard = TerminalRawModeGuard::setup()?;
+
+            // Bidirectional Copy
+            let mut pod_combined = tokio::io::join(pod_stdout, pod_stdin);
+            let mut local_combined = tokio::io::join(tokio::io::stdin(), tokio::io::stdout());
+
+            tokio::select! {
+                result = tokio::io::copy_bidirectional(&mut local_combined, &mut pod_combined) => {
+                    if let Err(err) = result && err.kind() != std::io::ErrorKind::BrokenPipe {
+                        return Err(err).context(error::CopyBidirectionalIoSnafu);
+                    }
+                },
+                result = &mut terminal_size_handle => {
+                    match result {
+                        Ok(_) => tracing::info!("End of terminal size stream"),
+                        Err(err) => tracing::warn!("Error getting terminal size: {err}")
+                    }
+                },
+            }
+            let _unused = local_combined.shutdown().await;
+            let _unused = pod_combined.shutdown().await;
         }
 
-        // 6. Cleanup
-        cancel_token.cancel();
-        let _unused = terminal_size_handle.await;
         let _unused = attached.join().await;
+
+        // Cleanup
+        cancel_token.cancel();
+        drop(cancel_token);
+
+        let _unused = terminal_size_handle.await;
 
         Ok(())
     }

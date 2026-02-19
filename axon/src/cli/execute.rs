@@ -48,7 +48,6 @@ impl ExecuteCommand {
             .await_running_status(&pod_name, &namespace, Duration::from_secs(timeout_secs))
             .await?;
 
-        // Delegate behavior
-        PodConsole::new(api, pod_name, namespace, command).attach().await.map_err(Error::from)
+        PodConsole::new(api, pod_name, namespace, command).run().await.map_err(Error::from)
     }
 }

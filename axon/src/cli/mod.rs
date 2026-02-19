@@ -181,6 +181,8 @@ impl Cli {
                 }
             }
 
+            println!("========= finished");
+
             Ok(0)
         };
 

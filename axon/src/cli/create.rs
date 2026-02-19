@@ -167,7 +167,7 @@ impl CreateCommand {
                 DEFAULT_INTERACTIVE_SHELL.iter().map(ToString::to_string).collect()
             });
             PodConsole::new(api, pod_name, namespace, interactive_shell)
-                .attach()
+                .run()
                 .await
                 .map_err(Error::from)
         } else {

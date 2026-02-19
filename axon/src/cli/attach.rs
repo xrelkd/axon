@@ -54,6 +54,6 @@ impl AttachCommand {
             if interactive_shell.is_empty() { pod.interactive_shell() } else { interactive_shell };
 
         // Delegate behavior
-        PodConsole::new(api, pod_name, namespace, shell).attach().await.map_err(Error::from)
+        PodConsole::new(api, pod_name, namespace, shell).run().await.map_err(Error::from)
     }
 }
