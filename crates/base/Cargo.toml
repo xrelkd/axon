@@ -1,6 +1,6 @@
 [package]
 name                   = "axon-base"
-description            = "Axon"
+description            = "Axon Base: Foundational utilities and shared logic for the Axon CLI."
 version.workspace      = true
 authors.workspace      = true
 homepage.workspace     = true

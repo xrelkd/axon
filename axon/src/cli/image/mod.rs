@@ -7,7 +7,10 @@ use crate::{cli::Error, config::Config};
 
 #[derive(Clone, Subcommand)]
 pub enum ImageCommands {
-    #[command(alias = "l", about = "List all images")]
+    #[command(
+        alias = "l",
+        about = "List all predefined container image specifications in the configuration."
+    )]
     List(ListCommand),
 }
 

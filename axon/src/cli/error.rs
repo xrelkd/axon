@@ -21,13 +21,13 @@ pub enum Error {
     #[snafu(display("{source}"))]
     PodConsole { source: crate::pod_console::Error },
 
-    #[snafu(display("Spec {spec_name} is not found"))]
+    #[snafu(display("Image specification '{spec_name}' not found"))]
     SpecNotFound { spec_name: String },
 
-    #[snafu(display("Failed to write stdout, error: {source}"))]
+    #[snafu(display("Failed to write to stdout, error: {source}"))]
     WriteStdout { source: std::io::Error },
 
-    #[snafu(display("Failed to initialize Kubernetes client, error: {source}"))]
+    #[snafu(display("Failed to initialize Kubernetes client configuration, error: {source}"))]
     KubeConfig { source: kube::Error },
 
     #[snafu(display("Failed to create pod {pod_name} in namespace {namespace}, error: {source}"))]
@@ -62,7 +62,9 @@ pub enum Error {
         source: Box<kube::Error>,
     },
 
-    #[snafu(display("Failed to wait for pod {pod_name} status in namespace {namespace}"))]
+    #[snafu(display(
+        "Timed out waiting for pod '{pod_name}' to reach running status in namespace '{namespace}'"
+    ))]
     WaitForPodStatus { namespace: String, pod_name: String },
 
     #[snafu(display(
@@ -82,12 +84,10 @@ pub enum Error {
         source: Box<kube::Error>,
     },
 
-    #[snafu(display("Could not create tokio runtime, error: {source}"))]
+    #[snafu(display("Failed to create tokio runtime, error: {source}"))]
     InitializeTokioRuntime { source: std::io::Error },
 
-    #[snafu(display(
-        "Failed to upload or authorize the SSH key in the pod {pod_name}, error: {source}"
-    ))]
+    #[snafu(display("Failed to upload or authorize SSH key in pod '{pod_name}', error: {source}"))]
     UploadSshKey {
         namespace: String,
         pod_name: String,
@@ -97,6 +97,9 @@ pub enum Error {
 
     #[snafu(display("No SSH private key is provided"))]
     NoSshPrivateKeyProvided,
+
+    #[snafu(display("Failed to serialize interactive shell configuration, error: {source}"))]
+    SerializeInteractiveShell { source: serde_json::Error },
 }
 
 impl From<crate::config::Error> for Error {
