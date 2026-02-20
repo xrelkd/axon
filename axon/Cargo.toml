@@ -1,6 +1,6 @@
 [package]
 name                   = "axon"
-description            = "Axon CLI: A robust tool for advanced Kubernetes resource management."
+description            = "A command-line tool designed to simplify your interactions with Kubernetes"
 version.workspace      = true
 authors.workspace      = true
 homepage.workspace     = true

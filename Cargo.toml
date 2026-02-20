@@ -4,10 +4,10 @@ authors      = ["xrelkd <46590321+xrelkd@users.noreply.github.com>"]
 homepage     = "https://github.com/xrelkd/axon"
 repository   = "https://github.com/xrelkd/axon"
 readme       = "README.md"
-license      = "GPL-3.0-only"
+license      = "MIT OR Apache-2.0"
 edition      = "2024"
 rust-version = "1.85"
-description  = "Clipboard manager written in Rust Programming Language."
+description  = "A command-line tool designed to simplify your interactions with Kubernetes"
 categories   = ["kubernetes"]
 keywords     = ["kubernetes"]
 
