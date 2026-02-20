@@ -86,20 +86,20 @@ impl LogConfig {
     #[must_use]
     pub const fn default_file_path() -> Option<PathBuf> { None }
 
-    /// Returns the default setting for `emit_journald`, which is `true`.
+    /// Returns the default setting for `emit_journald`, which is `false`.
     #[inline]
     #[must_use]
-    pub const fn default_emit_journald() -> bool { true }
+    pub const fn default_emit_journald() -> bool { false }
 
-    /// Returns the default setting for `emit_stdout`, which is `true`.
+    /// Returns the default setting for `emit_stdout`, which is `false`.
     #[inline]
     #[must_use]
-    pub const fn default_emit_stdout() -> bool { true }
+    pub const fn default_emit_stdout() -> bool { false }
 
-    /// Returns the default setting for `emit_stderr`, which is `false`.
+    /// Returns the default setting for `emit_stderr`, which is `true`.
     #[inline]
     #[must_use]
-    pub const fn default_emit_stderr() -> bool { false }
+    pub const fn default_emit_stderr() -> bool { true }
 
     /// Initializes the global `tracing` subscriber registry based on this
     /// `LogConfig`.

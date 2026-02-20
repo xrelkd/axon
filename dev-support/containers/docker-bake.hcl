@@ -21,7 +21,7 @@ target "axon" {
     "image.type"                      = "final"
     "image.authors"                   = "46590321+xrelkd@users.noreply.github.com"
     "image.vendor"                    = "xrelkd"
-    "image.description"               = "Axon"
+    "image.description"               = "Command-line tool designed to simplify your interactions with Kubernetes"
     "org.opencontainers.image.source" = "https://github.com/xrelkd/axon"
   }
 }

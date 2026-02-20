@@ -26,7 +26,7 @@ pub enum Error {
             paths.iter().map(|path| path.display().to_string()).collect::<Vec<_>>().join(", ")
         )
     )]
-    ResoluteIdentities {
+    ResolveIdentities {
         paths: Vec<PathBuf>,
 
         #[allow(clippy::use_self)]

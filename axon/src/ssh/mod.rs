@@ -112,7 +112,7 @@ where
         }
     }
 
-    Err(Error::ResoluteIdentities {
+    Err(Error::ResolveIdentities {
         paths: attempted_paths,
         source: last_error.map(Box::new).expect("`last_error` must be Some"),
     })
