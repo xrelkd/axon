@@ -1,43 +1,67 @@
+# --- Global Configuration ---
+# The default name assigned to the pod if not specified
 defaultPodName: axon
+# The default specification profile to use from the 'specs' list below
 defaultSpec: basic-1
-sshPrivateKeyFilePath: /path/to/your/ssh/private/key/file
+# Path to the private SSH key used for authentication/access
+sshPrivateKeyFilePath: ~/.ssh/id_ed25519
 
+# --- Logging Configuration ---
 log:
-  file_path: null
+  # Destination path for the log file
+  file_path: /tmp/axon.log
+  # Whether to send logs to systemd journald (disabled)
   emit_journald: false
-  emit_stdout: true
-  emit_stderr: false
+  # Whether to print logs to standard output (disabled)
+  emit_stdout: false
+  # Whether to print logs to standard error (enabled)
+  emit_stderr: true
+  # Logging verbosity level (INFO, DEBUG, WARN, ERROR, FATAL)
   level: INFO
 
+# --- Specification Profiles ---
 specs:
+  # Basic Alpine Linux environment
   - name: basic-1
     image: docker.io/alpine:latest
+    # imagePullPolicy options:
+    # - Always: Always pull the image from the registry on start
+    # - IfNotPresent: Only pull if the image is missing locally
+    # - Never: Only use local images; never attempt to pull
     imagePullPolicy: IfNotPresent
+    # Startup command and arguments to keep the container running
     command:
       - sh
     args:
       - -c
       - "while true; do sleep 1; done"
+    # The shell to use when entering the container interactively
     interactiveShell:
       - /bin/sh
+    # Mapping container ports to the local host machine
     portMappings:
+      # Example: Accessing 127.0.0.1:80 on host connects to port 80 in container
       - containerPort: 80
         localPort: 80
         address: 127.0.0.1
+      # Example: Local traffic (127.0.0.1:22222) -> Container service (port 22)
       - containerPort: 22
         localPort: 22222
         address: 127.0.0.1
+    # Definitions for internal service ports
     servicePorts:
       ssh: 22
       http: 8080
       https: 8443
 
+  # Nginx Web Server environment
   - name: nginx
     image: docker.io/nginx:1-alpine
     imagePullPolicy: IfNotPresent
     interactiveShell:
       - /bin/sh
     portMappings:
+      # Mapping local machine's 8080 to Nginx's default 80
       - containerPort: 80
         localPort: 8080
         address: 127.0.0.1
