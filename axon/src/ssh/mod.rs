@@ -79,10 +79,13 @@ pub async fn load_secret_key<P: AsRef<Path>>(
         })?
         .trim()
         .to_string();
-    let mut secret_key = russh::keys::decode_secret_key(&secret, password)
-        .map_err(|_| error::ParseSshPrivateKeySnafu.build())?;
-    secret_key.set_comment(String::new());
-    Ok(secret_key)
+    russh::keys::decode_secret_key(&secret, password)
+        .map(|mut secret_key| {
+            // Remove the comment
+            secret_key.set_comment(String::new());
+            secret_key
+        })
+        .map_err(|_| error::ParseSshPrivateKeySnafu.build())
 }
 
 pub async fn resolve_ssh_key_pair<I, P>(paths: I) -> Result<(PrivateKey, String), Error>
