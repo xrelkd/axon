@@ -27,6 +27,9 @@ concurrency:
 
 jobs:
   image:
+    permissions:
+      contents: read
+      packages: write
     if: ${{ github.actor != 'dependabot[bot]' }}
     name: Build and publish images
     runs-on: ubuntu-latest

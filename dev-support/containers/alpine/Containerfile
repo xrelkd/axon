@@ -9,10 +9,7 @@ RUN <<EOF
 set -eu
 
 apk add --no-cache \
-    musl-dev \
-    protobuf-dev \
-    zlib-dev \
-    zlib-static
+    musl-dev
 
 EOF
 
@@ -32,8 +29,8 @@ RUN <<EOF
 set -eu
 
 # check if executable works in this container
-/usr/bin/axon version
+/usr/bin/axon version --client
 
 EOF
 
-ENTRYPOINT [ "/usr/bin/axon", "version" ]
+ENTRYPOINT [ "/usr/bin/axon", "version", "--client" ]
