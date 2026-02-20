@@ -1,3 +1,6 @@
+//! This module provides the `ListCommand` for listing Kubernetes pods managed
+//! by Axon.
+
 use clap::Args;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{Api, api::ListParams};
@@ -15,6 +18,9 @@ use crate::{
     ui::table::PodListExt,
 };
 
+/// Represents the command to list Kubernetes pods managed by Axon.
+///
+/// This struct defines the command-line arguments available for listing pods.
 #[derive(Args, Clone)]
 pub struct ListCommand {
     #[arg(
@@ -34,6 +40,32 @@ pub struct ListCommand {
 }
 
 impl ListCommand {
+    /// Executes the list command, fetching and displaying Kubernetes pods
+    /// managed by Axon.
+    ///
+    /// This asynchronous function connects to the Kubernetes API, resolves the
+    /// target namespace (if not specified, it uses the current context's
+    /// namespace), and then lists pods that are labeled as managed by
+    /// `PROJECT_NAME`. The results are then rendered to standard output in
+    /// a tabular format.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - The `ListCommand` instance containing the command-line
+    ///   arguments.
+    /// * `kube_client` - A Kubernetes client instance used to interact with the
+    ///   Kubernetes API.
+    /// * `config` - The application configuration, potentially containing
+    ///   default namespace information.
+    ///
+    /// # Errors
+    ///
+    /// This function returns an `Error` if any of the following occur:
+    ///
+    /// * Listing pods from the Kubernetes API fails (e.g., due to network
+    ///   issues, authentication problems, or insufficient permissions).
+    /// * Resolving the Kubernetes namespace fails.
+    /// * Writing the output to `stdout` fails.
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
         let Self { namespace, all_namespaces } = self;
 

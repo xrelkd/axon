@@ -1,25 +1,59 @@
+//! This module defines the `ServicePorts` struct, which represents a collection
+//! of optional service ports for SSH, HTTP, and HTTPS. It provides
+//! functionality to convert between this struct and Kubernetes annotation
+//! key-value pairs.
+
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
 use crate::consts::k8s::annotations;
 
+/// Represents a collection of optional service ports for SSH, HTTP, and HTTPS.
+///
+/// This struct is used to manage and serialize/deserialize port configurations,
+/// particularly in the context of Kubernetes annotations.
 #[derive(Clone, Debug, Default, Deserialize, Eq, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ServicePorts {
+    /// The SSH port, if specified.
     pub ssh: Option<u16>,
 
+    /// The HTTP port, if specified.
     pub http: Option<u16>,
 
+    /// The HTTPS port, if specified.
     pub https: Option<u16>,
 }
 
 impl ServicePorts {
+    /// Creates a new `ServicePorts` instance with common default ports (SSH:
+    /// 22, HTTP: 80, HTTPS: 443).
+    ///
+    /// # Returns
+    ///
+    /// A `ServicePorts` instance with `ssh`, `http`, and `https` fields set to
+    /// their common defaults.
     #[allow(dead_code)]
     pub const fn common() -> Self { Self { ssh: Some(22), http: Some(80), https: Some(443) } }
 
-    /// Aggregates multiple annotations into a single `ServicePorts` struct
-    /// from any iterator of key-value pairs.
+    /// Aggregates multiple Kubernetes annotations into a single `ServicePorts`
+    /// struct.
+    ///
+    /// This function iterates over a collection of key-value pairs, parsing
+    /// each as a potential service port annotation and merging them into a
+    /// single `ServicePorts` instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `iter` - An iterator over items that can be converted into displayable
+    ///   key-value pairs. Each key and value will be converted to a string to
+    ///   check against Kubernetes service port annotation format.
+    ///
+    /// # Returns
+    ///
+    /// A `ServicePorts` instance representing the aggregated ports from the
+    /// provided annotations.
     pub fn from_kubernetes_annotations<I, K, V>(iter: I) -> Self
     where
         I: IntoIterator<Item = (K, V)>,
@@ -32,8 +66,16 @@ impl ServicePorts {
         })
     }
 
-    /// Helper to merge another `ServicePorts` struct into this one,
-    /// overwriting existing values if the other has Some.
+    /// Merges another `ServicePorts` struct into this one.
+    ///
+    /// If a port is `Some` in `other`, it will overwrite the corresponding port
+    /// in `self`. If a port is `None` in `other`, the corresponding port in
+    /// `self` remains unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - A reference to another `ServicePorts` instance to merge
+    ///   from.
     const fn merge(&mut self, other: &Self) {
         if let Some(p) = other.ssh {
             self.ssh = Some(p);
@@ -46,6 +88,25 @@ impl ServicePorts {
         }
     }
 
+    /// Creates a `ServicePorts` instance from a single Kubernetes annotation
+    /// key-value pair.
+    ///
+    /// This function attempts to parse the provided `key` and `value` to
+    /// extract a service port (ssh, http, or https) if it matches the
+    /// expected Kubernetes annotation format.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key of the Kubernetes annotation. Expected to be in the
+    ///   format `annotations::SERVICE_PORT_PREFIX/<port_type>`.
+    /// * `value` - The value of the Kubernetes annotation, expected to be a
+    ///   string representation of a `u16` port.
+    ///
+    /// # Returns
+    ///
+    /// A `ServicePorts` instance with the parsed port set, or
+    /// `ServicePorts::default()` if the key does not match the expected
+    /// format or the value cannot be parsed as a `u16`.
     pub fn from_kubernetes_annotation<K, V>(key: K, value: V) -> Self
     where
         K: fmt::Display,
@@ -72,6 +133,17 @@ impl ServicePorts {
         ports
     }
 
+    /// Converts the `ServicePorts` instance into a vector of Kubernetes
+    /// annotation key-value pairs.
+    ///
+    /// Each defined port (ssh, http, https) will be converted into a `(String,
+    /// String)` tuple, formatted according to the Kubernetes annotation
+    /// convention using `annotations::SERVICE_PORT_PREFIX`.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<(String, String)>` where each tuple represents a Kubernetes
+    /// annotation for a service port.
     pub fn to_kubernetes_annotation(&self) -> Vec<(String, String)> {
         let Self { ssh, http, https } = self;
         let mut kv = Vec::with_capacity(3);

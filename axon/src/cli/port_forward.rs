@@ -15,8 +15,15 @@ use crate::{
     port_forwarder::PortForwarderBuilder,
 };
 
+/// Command-line arguments for port forwarding.
+///
+/// This struct defines the parameters that can be passed to the `port-forward`
+/// command, allowing users to specify the target pod, namespace, and connection
+/// timeout.
 #[derive(Args, Clone)]
 pub struct PortForwardCommand {
+    /// Kubernetes namespace of the target pod. If not specified, the default
+    /// namespace will be used.
     #[arg(
         short,
         long,
@@ -25,6 +32,8 @@ pub struct PortForwardCommand {
     )]
     pub namespace: Option<String>,
 
+    /// Name of the temporary pod to forward ports for. If not specified, Axon's
+    /// default pod name will be used.
     #[arg(
         short = 'p',
         long = "pod-name",
@@ -33,6 +42,8 @@ pub struct PortForwardCommand {
     )]
     pub pod_name: Option<String>,
 
+    /// The maximum time in seconds to wait for the pod to be running before
+    /// timing out.
     #[arg(
         short = 't',
         long = "timeout-seconds",
@@ -43,6 +54,33 @@ pub struct PortForwardCommand {
 }
 
 impl PortForwardCommand {
+    /// Executes the port-forwarding operation based on the command-line
+    /// arguments.
+    ///
+    /// This function resolves the target pod and namespace, retrieves port
+    /// mappings from the pod's annotations, and then establishes
+    /// port-forwarding connections using a `LifecycleManager`. It continues
+    /// to forward ports until an interrupt signal (like Ctrl+C) is
+    /// received.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - The `PortForwardCommand` instance containing the resolved
+    ///   arguments.
+    /// * `kube_client` - A `kube::Client` instance used to interact with the
+    ///   Kubernetes API.
+    /// * `config` - The application's configuration.
+    ///
+    /// # Errors
+    ///
+    /// This function returns an `Error` in the following cases:
+    ///
+    /// * If there's an issue resolving the Kubernetes namespace or pod name.
+    /// * If the specified pod cannot be found or is not in a running state
+    ///   within the given `timeout_secs`.
+    /// * If there are issues connecting to the Kubernetes API.
+    /// * If an error occurs during the port-forwarding setup or during the
+    ///   lifetime of a port-forwarding session.
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
         let Self { namespace, pod_name, timeout_secs } = self;
 

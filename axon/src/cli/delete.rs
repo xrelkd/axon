@@ -1,3 +1,10 @@
+//! Handles the deletion of temporary Kubernetes pods managed by Axon.
+//!
+//! This module provides the `DeleteCommand` struct, which defines the
+//! command-line arguments and logic for deleting one or more temporary pods. It
+//! supports specifying pod names directly or using a fuzzy finder for
+//! interactive selection if no names are provided.
+
 use clap::{ArgAction, Args};
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
@@ -18,8 +25,18 @@ use crate::{
     ui::fuzzy_finder::PodListExt as _,
 };
 
+/// Represents the command-line arguments for deleting temporary Kubernetes
+/// pods.
+///
+/// This struct is used to parse the `delete` subcommand's arguments, allowing
+/// users to specify the namespace and the names of pods to be deleted. If no
+/// pod names are provided, an interactive fuzzy finder will be presented to
+/// select pods managed by Axon.
 #[derive(Args, Clone)]
 pub struct DeleteCommand {
+    /// Kubernetes namespace where the temporary pods are located.
+    ///
+    /// Defaults to the current Kubernetes context's namespace if not specified.
     #[arg(
         short,
         long,
@@ -28,6 +45,10 @@ pub struct DeleteCommand {
     )]
     pub namespace: Option<String>,
 
+    /// Names of the temporary pods to delete.
+    ///
+    /// If no names are provided, a fuzzy finder will be used to select pods
+    /// managed by Axon.
     #[arg(
         short = 'p',
         long = "pod-names",
@@ -39,6 +60,39 @@ pub struct DeleteCommand {
 }
 
 impl DeleteCommand {
+    /// Executes the delete command, connecting to Kubernetes to remove
+    /// specified pods.
+    ///
+    /// This function first resolves the target Kubernetes namespace. If no pod
+    /// names are provided in the command, it lists all pods labeled as
+    /// managed by Axon and uses an interactive fuzzy finder to allow the
+    /// user to select which ones to delete. It then proceeds to delete the
+    /// selected or specified pods.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - The `DeleteCommand` instance containing the parsed
+    ///   command-line arguments.
+    /// * `kube_client` - A `kube::Client` instance used to interact with the
+    ///   Kubernetes API.
+    /// * `config` - The application's `Config` instance.
+    ///
+    /// # Errors
+    ///
+    /// This function can return an `Error` in the following situations:
+    ///
+    /// * If the Kubernetes namespace cannot be resolved.
+    /// * If listing pods fails (e.g., due to network issues or insufficient
+    ///   permissions).
+    /// * If the fuzzy finder encounters an error during interactive pod
+    ///   selection.
+    /// * If deleting a specific pod fails.
+    ///
+    /// # Panics
+    ///
+    /// This function does not explicitly panic, but underlying `kube` or
+    /// `futures` operations might panic in extreme cases of unrecoverable
+    /// errors (e.g., OOM).
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
         let Self { namespace, pod_names } = self;
 
@@ -76,9 +130,9 @@ impl DeleteCommand {
                             namespace: namespace.clone(),
                         },
                     )?;
-                    tracing::info!("pod/{pod_name} deleted in namespace {namespace}");
+                    println!("pod/{pod_name} deleted in namespace {namespace}");
                 } else {
-                    tracing::info!("pod/{pod_name} does not exist in namespace {namespace}");
+                    println!("pod/{pod_name} does not exist in namespace {namespace}");
                 }
 
                 Ok::<(), Error>(())
