@@ -15,7 +15,8 @@ echo "Copying release files..."
 mkdir "$DIST"
 cp -v "target/$TARGET/release/axon" "$DIST"
 cp \
-    LICENSE \
+    LICENSE-MIT \
+    LICENSE-APACHE \
     README.md \
     "$DIST"
 
