@@ -171,15 +171,21 @@ impl Config {
             serde_yaml::from_slice(&data).context(error::ParseConfigSnafu { filename: path })?
         };
 
-        config.log.file_path = match config.log.file_path.map(|path| {
-            path.try_resolve()
-                .map(|path| path.to_path_buf())
-                .with_context(|_| error::ResolveFilePathSnafu { file_path: path.clone() })
-        }) {
-            Some(Ok(path)) => Some(path),
-            Some(Err(err)) => return Err(err),
-            None => None,
+        let try_resolve_path = |path: Option<&PathBuf>| -> Result<Option<PathBuf>, Error> {
+            match path.map(|path| {
+                path.try_resolve()
+                    .map(|path| path.to_path_buf())
+                    .with_context(|_| error::ResolveFilePathSnafu { file_path: path.clone() })
+            }) {
+                Some(Ok(path)) => Ok(Some(path)),
+                Some(Err(err)) => Err(err),
+                None => Ok(None),
+            }
         };
+
+        config.ssh_private_key_file_path =
+            try_resolve_path(config.ssh_private_key_file_path.as_ref())?;
+        config.log.file_path = try_resolve_path(config.log.file_path.as_ref())?;
 
         Ok(config)
     }
