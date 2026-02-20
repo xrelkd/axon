@@ -37,9 +37,12 @@ rustPlatform.buildRustPackage {
   '';
 
   meta = with lib; {
-    description = "Axon";
+    description = "Axon - Command-line tool designed to simplify your interactions with Kubernetes";
     homepage = "https://github.com/xrelkd/axon";
-    license = licenses.gpl3Only;
+    license = with licenses; [
+      mit
+      asl20
+    ];
     platforms = platforms.linux ++ platforms.darwin;
     maintainers = with maintainers; [ xrelkd ];
     mainProgram = "axon";

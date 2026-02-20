@@ -1,5 +1,5 @@
 {
-  description = "Axon - ";
+  description = "Axon - Command-line tool designed to simplify your interactions with Kubernetes";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
