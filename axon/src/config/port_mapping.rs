@@ -167,7 +167,7 @@ impl FromStr for PortMapping {
     /// ```
     /// use std::net::IpAddr;
     /// use std::str::FromStr;
-    /// use axon_config::config::port_mapping::{PortMapping, PortMappingError};
+    /// use axon::config::{PortMapping, PortMappingError};
     ///
     /// // IPv4 example
     /// let mapping_v4 = PortMapping::from_str("127.0.0.1:7070:8080")

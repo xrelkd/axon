@@ -15,7 +15,7 @@ use snafu::Snafu;
 /// Basic usage:
 ///
 /// ```rust
-/// use axon_config::ImagePullPolicy;
+/// use axon::config::ImagePullPolicy;
 ///
 /// let policy_if_not_present = ImagePullPolicy::IfNotPresent;
 /// let policy_always = ImagePullPolicy::Always;
@@ -87,8 +87,8 @@ impl FromStr for ImagePullPolicy {
     ///
     /// ```rust
     /// use std::str::FromStr;
-    /// use axon_config::ImagePullPolicy;
-    /// use axon_config::error::ParseImagePullPolicyError;
+    /// use axon::config::ImagePullPolicy;
+    /// use axon::config::ParseImagePullPolicyError;
     ///
     /// assert_eq!(ImagePullPolicy::from_str("IfNotPresent").unwrap(), ImagePullPolicy::IfNotPresent);
     /// assert_eq!(ImagePullPolicy::from_str("ifnotpresent").unwrap(), ImagePullPolicy::IfNotPresent);

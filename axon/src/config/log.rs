@@ -55,7 +55,7 @@ impl Default for LogConfig {
     ///
     /// ```rust
     /// use tracing::Level;
-    /// use axon_config::log::LogConfig; // Assuming 'axon_config' is the crate name
+    /// use axon::log::LogConfig;
     ///
     /// let default_config = LogConfig::default();
     /// assert_eq!(default_config.level, Level::INFO);
@@ -118,7 +118,7 @@ impl LogConfig {
     ///
     /// ```rust
     /// use tracing::Level;
-    /// use axon::log::LogConfig; // Assuming 'axon_config' is the crate name
+    /// use axon::log::LogConfig;
     ///
     /// // Create a configuration to log INFO level messages to stdout.
     /// let config = LogConfig {
@@ -199,7 +199,7 @@ impl LogDriver {
     /// use tracing_subscriber::{
     ///     Layer, layer::SubscriberExt, registry::LookupSpan, util::SubscriberInitExt,
     /// };
-    /// use axon_config::log::{LogDriver, LogConfig}; // Assuming 'axon_config' is the crate name
+    /// use axon::config::log::{LogDriver, LogConfig};
     ///
     /// // Example of creating a layer for stdout:
     /// let stdout_layer = LogDriver::Stdout.layer();
