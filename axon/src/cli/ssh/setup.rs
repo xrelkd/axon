@@ -1,3 +1,5 @@
+//! Provides the `setup` command for configuring SSH access to a running pod.
+
 use std::{path::PathBuf, time::Duration};
 
 use clap::Args;
@@ -14,8 +16,12 @@ use crate::{
     ssh,
 };
 
+/// Arguments for the `setup` command, used to configure SSH access to a
+/// specified Kubernetes pod.
 #[derive(Args, Clone)]
 pub struct SetupCommand {
+    /// Kubernetes namespace of the target pod. If not specified, the default
+    /// namespace will be used.
     #[arg(
         short,
         long,
@@ -24,6 +30,8 @@ pub struct SetupCommand {
     )]
     pub namespace: Option<String>,
 
+    /// Name of the temporary pod to set up SSH for. If not specified, Axon's
+    /// default pod name will be used.
     #[arg(
         short = 'p',
         long = "pod-name",
@@ -32,6 +40,8 @@ pub struct SetupCommand {
     )]
     pub pod_name: Option<String>,
 
+    /// The maximum time in seconds to wait for the pod to be running before
+    /// timing out.
     #[arg(
         short = 't',
         long = "timeout-seconds",
@@ -40,6 +50,9 @@ pub struct SetupCommand {
     )]
     pub timeout_secs: u64,
 
+    /// Path to the SSH private key file whose corresponding public key will be
+    /// authorized on the pod. If not specified, Axon will look for
+    /// `sshPrivateKeyFilePath` in the configuration.
     #[arg(
         short = 'i',
         long = "ssh-private-key-file",
@@ -51,6 +64,28 @@ pub struct SetupCommand {
 }
 
 impl SetupCommand {
+    /// Executes the SSH setup process on the target Kubernetes pod.
+    ///
+    /// This function resolves the target pod's identity, loads the SSH key
+    /// pair, waits for the pod to be in a running state, and then uploads
+    /// the public SSH key to the pod to authorize access.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - The `SetupCommand` instance containing the command arguments.
+    /// * `kube_client` - A `kube::Client` instance for interacting with the
+    ///   Kubernetes API.
+    /// * `config` - The application's `Config` instance.
+    ///
+    /// # Errors
+    ///
+    /// This function returns an `Err` variant of `crate::cli::Error` if:
+    ///
+    /// * The SSH private key file cannot be loaded or is invalid.
+    /// * The target pod cannot be found or fails to reach a running state
+    ///   within the specified timeout.
+    /// * There's an issue communicating with the Kubernetes API.
+    /// * The public SSH key cannot be uploaded to the pod.
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
         let Self { namespace, pod_name, timeout_secs, ssh_private_key_file } = self;
 
@@ -58,8 +93,12 @@ impl SetupCommand {
         let ResolvedResources { namespace, pod_name } =
             ResourceResolver::from((&kube_client, &config)).resolve(namespace, pod_name);
 
-        let (_, ssh_public_key) =
-            ssh::load_ssh_key_pair(ssh_private_key_file, config.ssh_private_key_file_path).await?;
+        let (_ssh_private_key, ssh_public_key) = ssh::resolve_ssh_key_pair(
+            [ssh_private_key_file.as_ref(), config.ssh_private_key_file_path.as_ref()]
+                .iter()
+                .flatten(),
+        )
+        .await?;
 
         let api = Api::<Pod>::namespaced(kube_client, &namespace);
         let _unused = api

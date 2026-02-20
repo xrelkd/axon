@@ -1,3 +1,12 @@
+//! This module defines the `create` CLI command, responsible for provisioning
+//! and optionally attaching to temporary Kubernetes pods.
+//!
+//! It handles the parsing of command-line arguments related to pod creation,
+//! resolves pod identity, constructs the Kubernetes Pod manifest based on
+//! user-defined specifications (default, preset, or manual), and interacts
+//! with the Kubernetes API to create the pod. Optionally, it can automatically
+//! attach to the pod's console upon successful creation.
+
 use std::{collections::BTreeMap, time::Duration};
 
 use clap::{ArgAction, Args, Parser};
@@ -24,8 +33,16 @@ use crate::{
 
 const DEFAULT_CONTAINER_NAME: &str = "axon-container";
 
+/// Represents the `create` command in the CLI, used for provisioning new
+/// temporary Kubernetes pods.
+///
+/// This struct defines the command-line arguments available for configuring
+/// the new pod, such as its namespace, name, automatic attachment behavior,
+/// and timeout settings.
 #[derive(Args, Clone)]
 pub struct CreateCommand {
+    /// Kubernetes namespace to create the pod in. Defaults to the current
+    /// Kubernetes context's namespace.
     #[arg(
         short = 'n',
         long = "namespace",
@@ -35,6 +52,8 @@ pub struct CreateCommand {
     )]
     pub namespace: Option<String>,
 
+    /// Name for the new temporary pod. If not specified, Axon's default pod
+    /// naming convention will be used.
     #[arg(
         short = 'p',
         long = "pod-name",
@@ -43,6 +62,8 @@ pub struct CreateCommand {
     )]
     pub pod_name: Option<String>,
 
+    /// Automatically attach to the pod's console after it has been successfully
+    /// created and is running.
     #[arg(
         short = 'a',
         long = "auto-attach",
@@ -51,6 +72,8 @@ pub struct CreateCommand {
     )]
     pub auto_attach: bool,
 
+    /// The maximum time in seconds to wait for the pod to be created and
+    /// running before timing out.
     #[arg(
         short = 't',
         long = "timeout-seconds",
@@ -60,11 +83,38 @@ pub struct CreateCommand {
     )]
     pub timeout_secs: u64,
 
+    /// Defines the mode for pod creation, specifying how the pod's image and
+    /// configuration are determined.
     #[command(subcommand)]
     pub mode: Option<Mode>,
 }
 
 impl CreateCommand {
+    /// Executes the `create` command, provisioning a new Kubernetes pod and
+    /// optionally attaching to its console.
+    ///
+    /// This function resolves the target namespace and pod name, determines
+    /// the pod specification based on the chosen `Mode` (default, preset, or
+    /// manual), constructs the Kubernetes Pod manifest, creates the pod in
+    /// the cluster, and if `auto_attach` is true, waits for the pod to be
+    /// running and then initiates an interactive console session.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - The `CreateCommand` instance containing the parsed arguments.
+    /// * `kube_client` - A Kubernetes client used to interact with the cluster
+    ///   API.
+    /// * `config` - The application's configuration, used to resolve pod
+    ///   specifications.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `Error` if:
+    /// - A specified preset `spec_name` is not found in the configuration.
+    /// - Serialization of the interactive shell command to JSON fails.
+    /// - Creation of the pod in Kubernetes fails.
+    /// - Waiting for the pod to reach a running state times out or fails.
+    /// - Attaching to the pod's console fails.
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
         let Self { namespace, pod_name, auto_attach, timeout_secs, mode } = self;
 
@@ -107,7 +157,7 @@ impl CreateCommand {
 
         let pod_exists = api.get(&pod_name).await.is_ok();
         if pod_exists {
-            tracing::info!("pod/{pod_name} has been created in namespace {namespace}");
+            println!("pod/{pod_name} has been created in namespace {namespace}");
         } else {
             // Construct the Pod Manifest
             let pod = build_pod_manifest(&pod_name, &namespace, target, &interactive_shell)?;
@@ -117,7 +167,7 @@ impl CreateCommand {
                     namespace: namespace.clone(),
                 })?;
 
-            tracing::info!("pod/{pod_name} created in namespace {namespace}");
+            println!("pod/{pod_name} created in namespace {namespace}");
         }
 
         if auto_attach {
@@ -134,6 +184,32 @@ impl CreateCommand {
     }
 }
 
+/// Builds a Kubernetes `Pod` manifest based on the provided specifications.
+///
+/// This function constructs a `Pod` object, populating its metadata (name,
+/// namespace, labels, annotations) and spec (containers, image, command,
+/// arguments, ports) according to the `pod_name`, `namespace`, `target`
+/// specification, and the interactive shell command.
+///
+/// # Arguments
+///
+/// * `pod_name` - The name of the pod to be created.
+/// * `namespace` - The Kubernetes namespace where the pod will reside.
+/// * `target` - A `Spec` object containing the desired configuration for the
+///   pod.
+/// * `interactive_shell` - A slice of strings representing the command and
+///   arguments for the interactive shell to be used when attaching to the
+///   container.
+///
+/// # Returns
+///
+/// A `Result` which is `Ok` containing the constructed `Pod` object, or an
+/// `Error` if serialization of the interactive shell command fails.
+///
+/// # Errors
+///
+/// Returns an `Error` if the `interactive_shell` cannot be serialized into a
+/// JSON string for the Kubernetes annotation.
 fn build_pod_manifest(
     pod_name: impl Into<String>,
     namespace: impl Into<String>,
@@ -197,16 +273,30 @@ fn build_pod_manifest(
     })
 }
 
+/// Defines the different modes for creating a Kubernetes pod.
+///
+/// Users can choose between a default configuration, a predefined preset
+/// from the application's configuration, or a fully manual specification
+/// of the container image, command, arguments, and port mappings.
 #[derive(Clone, Parser)]
 pub enum Mode {
+    /// Creates a pod using the default image and configuration specified
+    /// in the application's configuration.
     Default,
+    /// Creates a pod based on a named, predefined specification from the
+    /// application's configuration file.
     Preset {
+        /// Name of the predefined image specification to use from the
+        /// configuration file.
         #[arg(
             help = "Name of the predefined image specification to use from the configuration file."
         )]
         spec_name: String,
     },
+    /// Manually specifies all aspects of the pod's container.
     Manual {
+        /// Container image to use for the pod (e.g., `ubuntu:latest`,
+        /// `myregistry/myimage:v1`).
         #[arg(
             long = "image",
             default_value = "docker.io/alpine:3.23",
@@ -215,6 +305,8 @@ pub enum Mode {
         )]
         image: String,
 
+        /// Policy for pulling the container image (e.g., `Always`,
+        /// `IfNotPresent`, `Never`).
         #[arg(
             long = "image-pull-policy",
             default_value = "IfNotPresent",
@@ -223,6 +315,8 @@ pub enum Mode {
         )]
         image_pull_policy: ImagePullPolicy,
 
+        /// Command to execute as the container's entrypoint. Can be specified
+        /// multiple times for multiple arguments.
         #[arg(
             long = "command",
             action = ArgAction::Append,
@@ -231,6 +325,8 @@ pub enum Mode {
         )]
         command: Vec<String>,
 
+        /// Arguments to pass to the container's command. Can be specified
+        /// multiple times.
         #[arg(
             long = "args",
             action = ArgAction::Append,
@@ -239,6 +335,8 @@ pub enum Mode {
         )]
         args: Vec<String>,
 
+        /// Interactive shell command and arguments to use when attaching to the
+        /// container (e.g., `/bin/bash`, `bash -c 'sh'`).
         #[arg(
             long = "shell",
             action = ArgAction::Append,
@@ -247,6 +345,8 @@ pub enum Mode {
         )]
         interactive_shell: Vec<String>,
 
+        /// Port mappings to forward from the local machine to the container
+        /// (e.g., `8080:80/tcp`). Can be specified multiple times.
         #[arg(
             long = "ports",
             action = ArgAction::Append,

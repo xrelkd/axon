@@ -1,3 +1,6 @@
+//! Defines the `execute` command for running arbitrary commands within a
+//! Kubernetes pod.
+
 use std::time::Duration;
 
 use clap::Args;
@@ -13,8 +16,15 @@ use crate::{
     pod_console::PodConsole,
 };
 
+/// Represents the `execute` command and its arguments.
+///
+/// This command allows users to run arbitrary shell commands inside a specified
+/// Kubernetes pod.
 #[derive(Args, Clone)]
 pub struct ExecuteCommand {
+    /// Kubernetes namespace of the target pod.
+    ///
+    /// If not specified, Axon will attempt to determine the default namespace.
     #[arg(
         short,
         long,
@@ -23,6 +33,9 @@ pub struct ExecuteCommand {
     )]
     pub namespace: Option<String>,
 
+    /// Name of the temporary pod to execute the command on.
+    ///
+    /// If not specified, Axon's default pod naming convention will be used.
     #[arg(
         short = 'p',
         long = "pod-name",
@@ -31,6 +44,8 @@ pub struct ExecuteCommand {
     )]
     pub pod_name: Option<String>,
 
+    /// The maximum time in seconds to wait for the pod to be running before
+    /// timing out.
     #[arg(
         short = 't',
         long = "timeout-seconds",
@@ -39,6 +54,11 @@ pub struct ExecuteCommand {
     )]
     pub timeout_secs: u64,
 
+    /// The command and its arguments to execute inside the container.
+    ///
+    /// This argument is required and should be provided as a list of strings,
+    /// where the first string is the command itself and subsequent strings are
+    /// its arguments.
     #[arg(
         help = "The command and its arguments to execute inside the container.",
         required = true
@@ -47,6 +67,34 @@ pub struct ExecuteCommand {
 }
 
 impl ExecuteCommand {
+    /// Executes the specified command within a Kubernetes pod.
+    ///
+    /// This asynchronous function resolves the target pod's namespace and name,
+    /// waits for the pod to be in a running state, and then initiates a console
+    /// session to run the provided command.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - The `ExecuteCommand` instance containing the command details.
+    /// * `kube_client` - A `kube::Client` instance for interacting with the
+    ///   Kubernetes API.
+    /// * `config` - The application's `Config` settings.
+    ///
+    /// # Errors
+    ///
+    /// This function returns an `Err` variant of `Error` if:
+    ///
+    /// * The target namespace or pod name cannot be resolved.
+    /// * The specified pod does not reach a running state within the
+    ///   `timeout_secs`.
+    /// * There's an issue connecting to the pod's console or executing the
+    ///   command.
+    ///
+    /// # Panics
+    ///
+    /// This method does not explicitly panic, but underlying `kube` or `tokio`
+    /// operations could potentially panic in extreme error scenarios (e.g.,
+    /// OOM).
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
         let Self { namespace, pod_name, command, timeout_secs } = self;
 
