@@ -1,0 +1,43 @@
+defaultPodName: axon
+defaultSpec: basic-1
+sshPrivateKeyFilePath: /path/to/your/ssh/private/key/file
+
+log:
+  file_path: null
+  emit_journald: false
+  emit_stdout: true
+  emit_stderr: false
+  level: INFO
+
+specs:
+  - name: basic-1
+    image: docker.io/alpine:latest
+    imagePullPolicy: IfNotPresent
+    command:
+      - sh
+    args:
+      - -c
+      - "while true; do sleep 1; done"
+    interactiveShell:
+      - /bin/sh
+    portMappings:
+      - containerPort: 80
+        localPort: 80
+        address: 127.0.0.1
+      - containerPort: 22
+        localPort: 22222
+        address: 127.0.0.1
+    servicePorts:
+      ssh: 22
+      http: 8080
+      https: 8443
+
+  - name: nginx
+    image: docker.io/nginx:1-alpine
+    imagePullPolicy: IfNotPresent
+    interactiveShell:
+      - /bin/sh
+    portMappings:
+      - containerPort: 80
+        localPort: 8080
+        address: 127.0.0.1
