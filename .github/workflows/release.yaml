@@ -15,7 +15,7 @@ defaults:
 env:
   MAINTAINER: "xrelkd <46590321+xrelkd@users.noreply.github.com>"
   PACKAGE_NAME: "axon"
-  PACKAGE_DESCRIPTION: "Axon"
+  PACKAGE_DESCRIPTION: "Command-line tool designed to simplify your interactions with Kubernetes"
   CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-gnu-gcc
   CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
@@ -50,7 +50,7 @@ jobs:
       - name: Install Dependencies
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
-          sudo apt install -y --no-install-recommends musl-tools protobuf-compiler libprotobuf-dev
+          sudo apt install -y --no-install-recommends musl-tools
 
       - name: Install Rust Toolchain Components
         uses: actions-rs/toolchain@v1

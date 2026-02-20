@@ -100,7 +100,7 @@ impl FileTransferProgressBar {
     /// ```
     pub fn set_length(&self, len: u64) { self.inner.set_length(len); }
 
-    /// Wraps an `AsyncRead` implementor with the progress bar, allowing it to
+    /// Wraps an `AsyncRead` implementer with the progress bar, allowing it to
     /// track the progress of the read operation.
     ///
     /// # Type Parameters
@@ -113,7 +113,7 @@ impl FileTransferProgressBar {
     ///
     /// # Returns
     ///
-    /// An implementor of `tokio::io::AsyncRead` and `Unpin` that will update
+    /// An implementer of `tokio::io::AsyncRead` and `Unpin` that will update
     /// the progress bar as bytes are read.
     ///
     /// # Examples

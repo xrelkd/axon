@@ -57,7 +57,7 @@ shell-escape  = "0.1"
 skim          = "0.20"
 snafu         = "0.8"
 
-russh      = "0.57"
+russh      = { version = "0.57", default-features = false, features = ["ring"] }
 russh-sftp = "2"
 
 axon-base = { path = "./crates/base" }
