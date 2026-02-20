@@ -16,7 +16,7 @@ name = "axon"
 
 [workspace]
 resolver = "2"
-members  = ["axon", "crates/base", "crates/cli"]
+members  = ["axon"]
 
 [workspace.dependencies]
 tracing            = "0.1"
@@ -61,7 +61,6 @@ russh      = "0.57"
 russh-sftp = "2"
 
 axon-base = { path = "./crates/base" }
-axon-cli  = { path = "./crates/cli" }
 
 [workspace.lints.rust]
 async_fn_in_trait = "allow"

@@ -47,7 +47,7 @@ pub struct ShellCommand {
         short = 'i',
         long = "ssh-private-key-file",
         help = "Path to the SSH private key file for authentication. If not specified, Axon will \
-                look for `ssh_private_key_file_path` in the configuration."
+                look for `sshPrivateKeyFilePath` in the configuration."
     )]
     ssh_private_key_file: Option<PathBuf>,
 
@@ -59,7 +59,12 @@ pub struct ShellCommand {
     )]
     user: String,
 
-    #[arg(action = ArgAction::Append, default_value = "/bin/zsh", help = "The command and its arguments to execute as the interactive SSH shell. If not specified, Axon will attempt to detect the shell.")]
+    #[arg(
+        action = ArgAction::Append,
+        default_value = "/bin/zsh",
+        help = "The command and its arguments to execute as the interactive SSH shell. \
+                If not specified, Axon will attempt to detect the shell."
+    )]
     command: Vec<String>,
 }
 

@@ -1,4 +1,3 @@
-use axon_base::{PROJECT_NAME, consts::k8s::labels};
 use clap::Args;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{Api, api::ListParams};
@@ -6,11 +5,13 @@ use snafu::ResultExt;
 use tokio::io::AsyncWriteExt;
 
 use crate::{
+    PROJECT_NAME,
     cli::{
         error::{self, Error},
         internal::{ResolvedResources, ResourceResolver},
     },
     config::Config,
+    consts::k8s::labels,
     ui::table::PodListExt,
 };
 

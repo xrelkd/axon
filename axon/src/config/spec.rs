@@ -1,9 +1,10 @@
-use std::net::{IpAddr, Ipv4Addr};
-
-use axon_base::{PROJECT_NAME, consts};
 use serde::{Deserialize, Serialize};
 
-use crate::config::{ImagePullPolicy, PortMapping, ServicePorts};
+use crate::{
+    PROJECT_NAME,
+    config::{ImagePullPolicy, PortMapping, ServicePorts},
+    consts,
+};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,32 +32,6 @@ pub struct Spec {
 
     #[serde(default)]
     pub interactive_shell: Vec<String>,
-}
-
-impl Spec {
-    pub fn spec_malm() -> Self {
-        Self {
-            name: "malm".to_string(),
-            image: "ghcr.io/xrelkd/malm:0.7.0".to_string(),
-            image_pull_policy: ImagePullPolicy::IfNotPresent,
-            port_mappings: vec![
-                PortMapping {
-                    container_port: 8080,
-                    local_port: 8080,
-                    address: IpAddr::V4(Ipv4Addr::LOCALHOST),
-                },
-                PortMapping {
-                    container_port: 22,
-                    local_port: 22222,
-                    address: IpAddr::V4(Ipv4Addr::LOCALHOST),
-                },
-            ],
-            service_ports: ServicePorts { ssh: Some(22), http: Some(8080), https: None },
-            command: Vec::new(),
-            args: Vec::new(),
-            interactive_shell: vec!["/bin/zsh".to_string()],
-        }
-    }
 }
 
 impl Default for Spec {

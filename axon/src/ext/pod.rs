@@ -1,7 +1,10 @@
-use axon_base::{consts, consts::k8s::annotations};
 use k8s_openapi::{Metadata, api::core::v1::Pod};
 
-use crate::config::{PortMapping, ServicePorts};
+use crate::{
+    config::{PortMapping, ServicePorts},
+    consts,
+    consts::k8s::annotations,
+};
 
 pub trait PodExt {
     fn interactive_shell(&self) -> Vec<String>;

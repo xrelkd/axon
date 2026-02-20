@@ -2,8 +2,6 @@ use std::sync::LazyLock;
 
 pub mod k8s {
     pub mod labels {
-        pub const NAME: &str = "app.kubernetes.io/name";
-        pub const VERSION: &str = "app.kubernetes.io/version";
         pub const MANAGED_BY: &str = "app.kubernetes.io/managed-by";
     }
 
@@ -26,6 +24,6 @@ pub mod k8s {
 }
 
 pub const DEFAULT_POD_NAME: &str = "axon";
-pub const DEFAULT_IMAGE: &str = "docker.io/alpine:3.23";
+pub const DEFAULT_IMAGE: &str = "docker.io/alpine:latest";
 pub static DEFAULT_INTERACTIVE_SHELL: LazyLock<Vec<String>> =
     LazyLock::new(|| vec!["/bin/sh".to_string()]);

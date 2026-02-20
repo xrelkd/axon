@@ -19,6 +19,7 @@ tracing-subscriber = { workspace = true }
 
 serde      = { workspace = true }
 serde_json = { workspace = true }
+serde_with = { workspace = true }
 serde_yaml = { workspace = true }
 
 k8s-openapi = { workspace = true }
@@ -37,6 +38,7 @@ crossterm     = { workspace = true }
 directories   = { workspace = true }
 indicatif     = { workspace = true }
 resolve-path  = { workspace = true }
+semver        = { workspace = true }
 shadow-rs     = { workspace = true }
 shell-escape  = { workspace = true }
 skim          = { workspace = true }
@@ -44,9 +46,6 @@ snafu         = { workspace = true }
 
 russh      = { workspace = true }
 russh-sftp = { workspace = true }
-
-axon-base = { workspace = true }
-axon-cli  = { workspace = true }
 
 [build-dependencies]
 k8s-openapi = { workspace = true }

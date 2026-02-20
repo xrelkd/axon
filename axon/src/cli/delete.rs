@@ -1,4 +1,3 @@
-use axon_base::{PROJECT_NAME, consts::k8s::labels};
 use clap::{ArgAction, Args};
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
@@ -9,11 +8,13 @@ use kube::{
 use snafu::ResultExt;
 
 use crate::{
+    PROJECT_NAME,
     cli::{
         error::{self, Error},
         internal::{ResolvedResources, ResourceResolver},
     },
     config::Config,
+    consts::k8s::labels,
     ui::fuzzy_finder::PodListExt as _,
 };
 

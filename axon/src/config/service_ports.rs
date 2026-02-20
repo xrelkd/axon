@@ -1,7 +1,8 @@
 use std::fmt;
 
-use axon_base::consts::k8s::annotations;
 use serde::{Deserialize, Serialize};
+
+use crate::consts::k8s::annotations;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]

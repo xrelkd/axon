@@ -4,9 +4,10 @@ use std::{
     str::FromStr,
 };
 
-use axon_base::consts::k8s::annotations;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+
+use crate::consts::k8s::annotations;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]

@@ -21,11 +21,11 @@ use self::{
     attach::AttachCommand, create::CreateCommand, delete::DeleteCommand, execute::ExecuteCommand,
     image::ImageCommands, list::ListCommand, port_forward::PortForwardCommand, ssh::SshCommands,
 };
-use crate::{config::Config, shadow};
+use crate::{CLI_PROGRAM_NAME, config::Config, shadow};
 
 #[derive(Parser)]
 #[command(
-    name = axon_base::CLI_PROGRAM_NAME,
+    name = CLI_PROGRAM_NAME,
     author,
     version,
     long_version = shadow::CLAP_LONG_VERSION,
@@ -147,10 +147,8 @@ impl Cli {
                 return Ok(0);
             }
             Some(Commands::DefaultConfig) => {
-                let config_text =
-                    serde_yaml::to_string(&Config::default()).expect("Config is serializable");
                 std::io::stdout()
-                    .write_all(config_text.as_bytes())
+                    .write_all(Config::template_basic().as_slice())
                     .expect("Failed to write to stdout");
                 return Ok(0);
             }

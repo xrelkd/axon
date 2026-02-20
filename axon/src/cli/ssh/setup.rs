@@ -45,7 +45,7 @@ pub struct SetupCommand {
         long = "ssh-private-key-file",
         help = "Path to the SSH private key file whose corresponding public key will be \
                 authorized on the pod. If not specified, Axon will look for \
-                `ssh_private_key_file_path` in the configuration."
+                `sshPrivateKeyFilePath` in the configuration."
     )]
     pub ssh_private_key_file: Option<PathBuf>,
 }
@@ -53,11 +53,13 @@ pub struct SetupCommand {
 impl SetupCommand {
     pub async fn run(self, kube_client: kube::Client, config: Config) -> Result<(), Error> {
         let Self { namespace, pod_name, timeout_secs, ssh_private_key_file } = self;
-        let (_, ssh_public_key) = ssh::load_ssh_key_pair(ssh_private_key_file, None).await?;
 
         // Resolve Identity
         let ResolvedResources { namespace, pod_name } =
             ResourceResolver::from((&kube_client, &config)).resolve(namespace, pod_name);
+
+        let (_, ssh_public_key) =
+            ssh::load_ssh_key_pair(ssh_private_key_file, config.ssh_private_key_file_path).await?;
 
         let api = Api::<Pod>::namespaced(kube_client, &namespace);
         let _unused = api

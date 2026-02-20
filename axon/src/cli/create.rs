@@ -1,9 +1,5 @@
 use std::{collections::BTreeMap, time::Duration};
 
-use axon_base::consts::{
-    DEFAULT_INTERACTIVE_SHELL,
-    k8s::{annotations, labels},
-};
 use clap::{ArgAction, Args, Parser};
 use k8s_openapi::api::core::v1::{Container, ContainerPort, Pod, PodSpec};
 use kube::{
@@ -13,11 +9,16 @@ use kube::{
 use snafu::{OptionExt, ResultExt};
 
 use crate::{
+    PROJECT_NAME,
     cli::{
         Error, error,
         internal::{ApiPodExt, ResolvedResources, ResourceResolver},
     },
     config::{Config, ImagePullPolicy, PortMapping, ServicePorts, Spec},
+    consts::{
+        DEFAULT_INTERACTIVE_SHELL,
+        k8s::{annotations, labels},
+    },
     pod_console::PodConsole,
 };
 
@@ -152,10 +153,7 @@ fn build_pod_manifest(
             .collect::<Vec<_>>()
     });
 
-    let labels = BTreeMap::from_iter([(
-        labels::MANAGED_BY.to_string(),
-        axon_base::PROJECT_NAME.to_string(),
-    )]);
+    let labels = BTreeMap::from_iter([(labels::MANAGED_BY.to_string(), PROJECT_NAME.to_string())]);
 
     let annotations = {
         let shell_json = serde_json::to_string(&interactive_shell)

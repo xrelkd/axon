@@ -1,23 +1,27 @@
 mod error;
 mod image_pull_policy;
+mod log;
 mod port_mapping;
 mod service_ports;
 mod spec;
 
 use std::path::{Path, PathBuf};
 
-use axon_base::PROJECT_NAME;
 use resolve_path::PathResolveExt;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
 pub use self::{
-    error::Error, image_pull_policy::ImagePullPolicy, port_mapping::PortMapping,
+    error::Error, image_pull_policy::ImagePullPolicy, log::LogConfig, port_mapping::PortMapping,
     service_ports::ServicePorts, spec::Spec,
+};
+use crate::{
+    CLI_CONFIG_NAME, PROJECT_CONFIG_DIR, PROJECT_NAME, consts::DEFAULT_POD_NAME,
+    fallback_project_config_directories,
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Config {
     #[serde(default = "default_pod_name")]
     pub default_pod_name: String,
@@ -28,30 +32,18 @@ pub struct Config {
     pub ssh_private_key_file_path: Option<PathBuf>,
 
     #[serde(default)]
-    pub specs: Vec<Spec>,
+    pub log: LogConfig,
 
     #[serde(default)]
-    pub log: axon_cli::config::LogConfig,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            default_pod_name: default_pod_name(),
-            default_spec: default_spec(),
-            ssh_private_key_file_path: None,
-            specs: vec![Spec::spec_malm(), Spec::default()],
-            log: axon_cli::config::LogConfig::default(),
-        }
-    }
+    pub specs: Vec<Spec>,
 }
 
 impl Config {
     pub fn search_config_file_path() -> PathBuf {
         let paths = vec![Self::default_path()]
             .into_iter()
-            .chain(axon_base::fallback_project_config_directories().into_iter().map(|mut path| {
-                path.push(axon_base::CLI_CONFIG_NAME);
+            .chain(fallback_project_config_directories().into_iter().map(|mut path| {
+                path.push(CLI_CONFIG_NAME);
                 path
             }))
             .collect::<Vec<_>>();
@@ -68,9 +60,7 @@ impl Config {
 
     #[inline]
     pub fn default_path() -> PathBuf {
-        [axon_base::PROJECT_CONFIG_DIR.to_path_buf(), PathBuf::from(axon_base::CLI_CONFIG_NAME)]
-            .into_iter()
-            .collect()
+        [PROJECT_CONFIG_DIR.to_path_buf(), PathBuf::from(CLI_CONFIG_NAME)].into_iter().collect()
     }
 
     #[inline]
@@ -105,8 +95,20 @@ impl Config {
     pub fn find_spec_by_name(&self, name: &str) -> Option<Spec> {
         self.specs.iter().find(|img| img.name == name).cloned()
     }
+
+    pub fn template_basic() -> Vec<u8> { include_bytes!("templates/basic.yaml").to_vec() }
 }
 
-fn default_pod_name() -> String { PROJECT_NAME.to_string() }
+fn default_pod_name() -> String { DEFAULT_POD_NAME.to_string() }
 
 fn default_spec() -> String { PROJECT_NAME.to_string() }
+
+#[cfg(test)]
+mod tests {
+    use super::Config;
+
+    #[test]
+    fn test_templates() {
+        let _basic = serde_yaml::from_slice::<Config>(&Config::template_basic()).unwrap();
+    }
+}

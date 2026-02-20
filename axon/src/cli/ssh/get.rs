@@ -48,7 +48,7 @@ pub struct GetCommand {
         short = 'i',
         long = "ssh-private-key-file",
         help = "Path to the SSH private key file for authentication. If not specified, Axon will \
-                look for `ssh_private_key_file_path` in the configuration."
+                look for `sshPrivateKeyFilePath` in the configuration."
     )]
     ssh_private_key_file: Option<PathBuf>,
 
