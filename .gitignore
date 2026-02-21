@@ -19,3 +19,5 @@ result
 
 # ignore `dist` directory which is generated while creating package
 dist/
+
+.aider*
