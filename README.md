@@ -72,30 +72,38 @@ Here are some common usage examples:
 - **Attach to an interactive shell in a pod:**
 
   ```bash
-  axon attach --namespace default my-database-pod
+  axon attach my-database-pod --namespace default
   ```
 
 - **Forward local ports to a pod (configured via annotations):**
+  Axon can establish port-forwarding based on annotations defined on the target pod.
+  For example, a pod with an annotation like `axon.dev/port-forward-8080="8080:3000"` would
+  forward local port `8080` to container port `3000`.
 
   ```bash
   axon port-forward my-web-app-pod
   ```
 
-- **Open an SSH shell on a pod:**
-
-  ```bash
-  axon ssh shell my-remote-server-pod --user admin
-  ```
-
-- **Upload a file via SSH:**
-
-  ```bash
-  axon ssh put ./local/path/to/file.txt my-pod:/remote/path/to/destination.txt
-  ```
-
 - **List predefined container images:**
   ```bash
   axon image list
+  ```
+
+### SSH Access
+
+The `axon ssh` command provides subcommands for setting up SSH access, opening an interactive shell, and downloading files.
+
+- **Set up SSH on a temporary pod:**
+  ```bash
+  axon ssh setup my-temporary-pod --namespace default
+  ```
+- **Open an interactive SSH shell:**
+  ```bash
+  axon ssh shell my-remote-server-pod --user admin --namespace default
+  ```
+- **Download a file from a remote pod:**
+  ```bash
+  axon ssh get my-remote-server-pod:/var/log/app.log ./app.log --namespace default
   ```
 
 ## License
