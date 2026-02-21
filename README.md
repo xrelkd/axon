@@ -19,8 +19,8 @@ This command will list all pods in your current Kubernetes context's default nam
 - **Port Forwarding**: Establish local port-forwarding connections to services running inside Kubernetes pods, based on pod annotations.
 - **Image Management**: List all predefined container image specifications configured in Axon.
 - **SSH Access**: Securely interact with Kubernetes pods using SSH for shell access or file transfers.
+  - **SSH Setup**: Sets up SSH access on a temporary pod.
   - **SSH Shell**: Open an interactive SSH shell on a remote pod.
-  - **SSH Put**: Upload files from your local machine to a remote pod.
   - **SSH Get**: Download files from a remote pod to your local machine.
 
 ## Installation
