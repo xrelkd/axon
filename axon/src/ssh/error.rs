@@ -29,7 +29,11 @@ pub enum Error {
     ResolveIdentities {
         paths: Vec<PathBuf>,
 
-        #[allow(clippy::use_self)]
+        #[expect(
+            clippy::use_self,
+            reason = "Recursive enum requires Box<Self>; use of `Error` instead of `Self` is \
+                      intentional for clarity"
+        )]
         source: Box<Error>,
     },
 
