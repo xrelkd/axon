@@ -145,7 +145,10 @@ impl PortMapping {
 impl FromStr for PortMapping {
     type Err = PortMappingError;
 
-    #[allow(clippy::doc_markdown)]
+    #[expect(
+        clippy::doc_markdown,
+        reason = "Documentation uses code-style formatting for technical terms that Clippy flags"
+    )]
     /// Parses a `PortMapping` from a string in the format
     /// `ADDRESS:LOCAL_PORT:CONTAINER_PORT`.
     ///
@@ -211,7 +214,10 @@ impl FromStr for PortMapping {
 
 /// Represents possible errors that can occur when parsing or creating a
 /// `PortMapping`.
-#[allow(clippy::enum_variant_names)]
+#[expect(
+    clippy::enum_variant_names,
+    reason = "Variant names intentionally verbose to match error types across crates"
+)]
 #[derive(Debug, Snafu, PartialEq, Eq)]
 #[snafu(visibility(pub))]
 pub enum PortMappingError {

@@ -342,7 +342,11 @@ where
     ///     Ok(())
     /// }
     /// ```
-    #[allow(clippy::too_many_lines)]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "Main event loop contains core state machine; refactoring would reduce \
+                  readability"
+    )]
     pub async fn run(
         self,
         shutdown_signal: impl Future<Output = ()> + Send + Unpin + 'static,

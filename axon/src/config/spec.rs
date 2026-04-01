@@ -66,13 +66,11 @@ pub struct Spec {
 
     /// The Docker image to use for the container (e.g., "ubuntu:latest",
     /// "my-repo/my-image:1.0").
-    #[allow(clippy::struct_field_names)]
     pub image: String,
 
     /// Defines when the Docker image should be pulled.
     ///
     /// Defaults to `ImagePullPolicy::Always` if not specified.
-    #[allow(clippy::struct_field_names)]
     #[serde(default)]
     pub image_pull_policy: ImagePullPolicy,
 

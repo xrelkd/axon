@@ -217,7 +217,11 @@ impl LogDriver {
     /// // tracing::info!("Logs are now going to stdout!");
     /// std::fs::remove_file(file_path).ok(); // Clean up test file
     /// ```
-    #[allow(clippy::type_repetition_in_bounds)]
+    #[expect(
+        clippy::type_repetition_in_bounds,
+        reason = "Trait bounds require both Subscriber and LookupSpan for tracing-subscriber \
+                  compatibility"
+    )]
     fn layer<S>(self) -> Option<Box<dyn Layer<S> + Send + Sync + 'static>>
     where
         S: tracing::Subscriber,
