@@ -36,19 +36,18 @@ use crate::{
 /// # Examples
 ///
 /// ```rust
-/// use crate::config::{ImagePullPolicy, PortMapping, ServicePorts, Spec};
+/// use std::net::IpAddr;
+/// use axon::config::{ImagePullPolicy, PortMapping, Spec};
 ///
 /// let spec = Spec {
 ///     name: "my-custom-container".to_string(),
 ///     image: "ubuntu:latest".to_string(),
 ///     image_pull_policy: ImagePullPolicy::IfNotPresent,
-///     port_mappings: vec![
-///         PortMapping {
-///             host_port: 8080,
-///             container_port: 80,
-///         },
-///     ],
-///     service_ports: ServicePorts::default(),
+///     port_mappings: vec![PortMapping {
+///         container_port: 80,
+///         local_port: 8080,
+///         address: "127.0.0.1".parse::<IpAddr>().unwrap(),
+///     }],
 ///     command: vec!["bash".to_string()],
 ///     args: vec!["-c".to_string(), "echo Hello World!".to_string()],
 ///     interactive_shell: vec!["/bin/bash".to_string()],

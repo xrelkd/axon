@@ -1,3 +1,8 @@
+//! Configuration error types.
+//!
+//! This module defines the [`Error`] enum for configuration-related failures,
+//! such as file I/O errors and YAML parsing failures.
+
 use std::path::PathBuf;
 
 use snafu::Snafu;

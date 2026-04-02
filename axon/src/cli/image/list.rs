@@ -1,3 +1,8 @@
+//! Image list subcommand implementation.
+//!
+//! This module provides the `image list` subcommand, which displays all
+//! configured container specifications in a formatted table.
+
 use clap::Args;
 use snafu::ResultExt;
 use tokio::io::AsyncWriteExt;

@@ -88,6 +88,84 @@ pub async fn load_secret_key<P: AsRef<Path>>(
         .map_err(|_| error::ParseSshPrivateKeySnafu.build())
 }
 
+/// Resolves an SSH key pair by trying multiple file paths in order.
+///
+/// This function iterates through the provided paths, attempting to load each
+/// as an SSH private key using [`load_secret_key`]. The first successfully
+/// loaded key is returned along with its corresponding public key in OpenSSH
+/// format.
+///
+/// # Arguments
+///
+/// * `paths` - An iterable of file paths to try, in priority order.
+///
+/// # Errors
+///
+/// This function returns an `Err` if:
+///
+/// * None of the provided paths contain a valid SSH private key. The error will
+///   be of type `Error::ResolveIdentities`, containing all attempted paths and
+///   the last error encountered.
+/// * A valid key is found but its public key cannot be serialized to OpenSSH
+///   format. The error will be of type `error::SerializeSshPublicKeySnafu`.
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::path::PathBuf;
+/// use axon::ssh;
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let paths = vec![
+///         PathBuf::from("~/.ssh/id_ed25519"),
+///         PathBuf::from("~/.ssh/id_rsa"),
+///     ];
+///
+///     let (private_key, public_key) = ssh::resolve_ssh_key_pair(paths).await?;
+///     println!("Loaded key with public key: {}", public_key);
+///     Ok(())
+/// }
+/// ```
+/// Resolves an SSH key pair by trying multiple file paths in order.
+///
+/// This function iterates through the provided paths, attempting to load each
+/// as an SSH private key using [`load_secret_key`]. The first successfully
+/// loaded key is returned along with its corresponding public key in OpenSSH
+/// format.
+///
+/// # Arguments
+///
+/// * `paths` - An iterable of file paths to try, in priority order.
+///
+/// # Errors
+///
+/// This function returns an `Err` if:
+///
+/// * None of the provided paths contain a valid SSH private key. The error will
+///   be of type `Error::ResolveIdentities`, containing all attempted paths and
+///   the last error encountered.
+/// * A valid key is found but its public key cannot be serialized to OpenSSH
+///   format. The error will be of type `error::SerializeSshPublicKeySnafu`.
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::path::PathBuf;
+/// use axon::ssh;
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let paths = vec![
+///         PathBuf::from("~/.ssh/id_ed25519"),
+///         PathBuf::from("~/.ssh/id_rsa"),
+///     ];
+///
+///     let (private_key, public_key) = ssh::resolve_ssh_key_pair(paths).await?;
+///     println!("Loaded key with public key: {}", public_key);
+///     Ok(())
+/// }
+/// ```
 pub async fn resolve_ssh_key_pair<I, P>(paths: I) -> Result<(PrivateKey, String), Error>
 where
     I: IntoIterator<Item = P>,

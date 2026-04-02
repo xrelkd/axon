@@ -1,3 +1,13 @@
+//! Terminal operation error types.
+//!
+//! This module defines the [`Error`] enum for terminal-related failures,
+//! such as failures to enable raw mode.
+
+//! Terminal operation error types.
+//!
+//! This module defines the [`Error`] enum for terminal-related failures,
+//! such as failures to enable raw mode.
+
 use snafu::Snafu;
 
 /// Represents errors that can occur during terminal operations.

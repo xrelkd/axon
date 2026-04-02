@@ -1,4 +1,4 @@
-/// This module provides extensions for the Kubernetes `Api<Pod>` type.
+//! This module provides extensions for the Kubernetes `Api<Pod>` type.
 use std::time::Duration;
 
 use k8s_openapi::api::core::v1::Pod;

@@ -1,3 +1,9 @@
+//! SSH file transfer operations.
+//!
+//! This module provides [`FileTransfer`] and [`FileTransferRunner`] for
+//! executing file upload and download operations over SSH connections,
+//! with progress bar support and automatic resource cleanup.
+
 use std::{net::SocketAddr, path::PathBuf};
 
 use crate::{
