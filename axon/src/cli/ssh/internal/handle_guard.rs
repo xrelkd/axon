@@ -1,3 +1,8 @@
+//! Handle guard for sigfinn lifecycle management.
+//!
+//! This module provides [`HandleGuard`], a RAII guard that ensures
+//! sigfinn handles are cleanly shut down when they go out of scope.
+
 use crate::cli::Error;
 
 /// A guard that manages the shutdown of a `sigfinn` handle.

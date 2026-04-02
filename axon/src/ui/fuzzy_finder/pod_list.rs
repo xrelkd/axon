@@ -107,6 +107,10 @@ impl PodListExt for ObjectList<Pod> {
 /// A wrapper struct for `k8s_openapi::api::core::v1::Pod` that implements the
 /// `SkimItem` trait, making `Pod` objects compatible with the `skim` fuzzy
 /// finder.
+///
+/// This struct adapts a Kubernetes `Pod` to display key information (name,
+/// image, phase, namespace, node name) in the fuzzy finder interface and
+/// returns the pod name when selected.
 pub struct PodSkimItem(Pod);
 
 /// Implements the `From` trait to convert a `k8s_openapi::api::core::v1::Pod`

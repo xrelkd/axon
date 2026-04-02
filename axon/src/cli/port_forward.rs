@@ -1,3 +1,15 @@
+//! Port forwarding command implementation.
+//!
+//! This module provides the `port-forward` subcommand, which establishes
+//! port forwarding connections between the local machine and a Kubernetes
+//! pod based on port mappings defined in pod annotations.
+
+//! Port forwarding command implementation.
+//!
+//! This module provides the `port-forward` subcommand, which establishes
+//! port forwarding connections between the local machine and a Kubernetes
+//! pod based on port mappings defined in pod annotations.
+
 use std::{net::SocketAddr, time::Duration};
 
 use clap::Args;

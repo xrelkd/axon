@@ -1,3 +1,9 @@
+//! Terminal raw mode management.
+//!
+//! This module provides utilities for enabling and disabling terminal raw
+//! mode, using a RAII guard ([`TerminalRawModeGuard`]) to ensure the
+//! terminal is restored to its previous state even on unexpected exits.
+
 mod error;
 
 use std::io::Write;

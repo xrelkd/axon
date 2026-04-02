@@ -1,3 +1,9 @@
+//! Kubernetes resource resolution utilities.
+//!
+//! This module provides [`ResourceResolver`] for determining the target
+//! namespace and pod name, falling back to defaults from the Kubernetes
+//! client and application configuration when not explicitly specified.
+
 use crate::config::Config;
 
 /// A struct responsible for resolving Kubernetes resource names,
