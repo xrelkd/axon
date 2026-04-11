@@ -7,7 +7,10 @@ use std::{borrow::Cow, sync::Arc};
 
 use k8s_openapi::api::core::v1::Pod;
 use kube::api::ObjectList;
-use skim::{Skim, SkimItem, SkimItemReceiver, SkimItemSender, SkimOptions, prelude::unbounded};
+use skim::{
+    Skim, SkimItem, SkimItemReceiver, SkimItemSender, SkimOptions,
+    prelude::{SkimOptionsBuilder, unbounded},
+};
 
 use crate::ui::fuzzy_finder::COLUMN_SEPARATOR;
 
@@ -165,5 +168,9 @@ fn pod_column(pod: &Pod) -> [String; 5] {
 /// # Returns
 /// A `SkimOptions` struct configured for pod selection.
 fn generate_skim_options() -> SkimOptions {
-    SkimOptions { height: "100%".to_string(), multi: false, ..Default::default() }
+    SkimOptionsBuilder::default()
+        .height("100%")
+        .multi(false)
+        .build()
+        .expect("Failed to build SkimOptions")
 }
