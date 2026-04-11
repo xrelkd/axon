@@ -18,23 +18,4 @@ pub mod terminal;
 /// This struct provides functionality to create and update a progress bar,
 /// typically used in a terminal UI, to visualize the progress of file upload or
 /// download operations.
-///
-/// # Examples
-///
-/// ```rust
-/// use axon::ui::FileTransferProgressBar;
-/// use std::thread;
-/// use std::time::Duration;
-///
-/// // Create a new progress bar with a total size of 100 units
-/// let progress_bar = FileTransferProgressBar::new("Downloading file", 100);
-///
-/// // Simulate progress
-/// for i in 0..=100 {
-///     progress_bar.set_progress(i);
-///     thread::sleep(Duration::from_millis(10));
-/// }
-///
-/// progress_bar.finish();
-/// ```
 pub use self::file_transfer_progress_bar::FileTransferProgressBar;

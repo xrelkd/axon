@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://nfpm.goreleaser.com/schema.json
+
+name: "@NAME@"
+arch: "@ARCH@"
+platform: "linux"
+version: "@VERSION@"
+section: "utils"
+priority: "optional"
+maintainer: "xrelkd"
+description: |
+  Axon - Command-line tool designed to simplify your interactions with Kubernetes.
+vendor: "Axon"
+homepage: "https://github.com/xrelkd/axon"
+license: "MIT"
+
+contents:
+  - src: ./usr/bin/axon
+    dst: /usr/bin/axon
+
+overrides:
+  deb:
+    depends:
+      - bash-completion
+  rpm:
+    depends:
+      - bash-completion
+  apk:
+    depends:
+      - bash-completion

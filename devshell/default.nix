@@ -32,12 +32,14 @@ pkgs.mkShell {
 
     tokei
 
+    typos
+
     jq
 
     buf
     hclfmt
     nixfmt
-    nodePackages.prettier
+    prettier
     shfmt
     taplo
     treefmt

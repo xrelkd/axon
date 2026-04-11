@@ -18,34 +18,12 @@ impl FileTransferProgressBar {
     /// operation.
     ///
     /// The progress bar will display "Uploading" as its message.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use axon::ui::file_transfer_progress_bar::FileTransferProgressBar;
-    ///
-    /// let upload_bar = FileTransferProgressBar::new_upload();
-    /// upload_bar.set_length(100);
-    /// // ... use upload_bar.wrap_async_read(...)
-    /// upload_bar.finish();
-    /// ```
     pub fn new_upload() -> Self { Self::new(Direction::Upload) }
 
     /// Creates a new `FileTransferProgressBar` configured for a download
     /// operation.
     ///
     /// The progress bar will display "Downloading" as its message.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use axon::ui::file_transfer_progress_bar::FileTransferProgressBar;
-    ///
-    /// let download_bar = FileTransferProgressBar::new_download();
-    /// download_bar.set_length(200);
-    /// // ... use download_bar.wrap_async_read(...)
-    /// download_bar.finish();
-    /// ```
     pub fn new_download() -> Self { Self::new(Direction::Download) }
 
     /// Creates a new `FileTransferProgressBar` with a specified transfer
@@ -89,15 +67,6 @@ impl FileTransferProgressBar {
     /// # Arguments
     ///
     /// * `len` - The total number of units (e.g., bytes) for the progress bar.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use axon::ui::file_transfer_progress_bar::FileTransferProgressBar;
-    ///
-    /// let bar = FileTransferProgressBar::new_upload();
-    /// bar.set_length(1024 * 1024); // Set total to 1MB
-    /// ```
     pub fn set_length(&self, len: u64) { self.inner.set_length(len); }
 
     /// Wraps an `AsyncRead` implementer with the progress bar, allowing it to
@@ -115,28 +84,6 @@ impl FileTransferProgressBar {
     ///
     /// An implementer of `tokio::io::AsyncRead` and `Unpin` that will update
     /// the progress bar as bytes are read.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use axon::ui::file_transfer_progress_bar::FileTransferProgressBar;
-    /// use tokio::io::{AsyncReadExt, Result};
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<()> {
-    ///     let data = b"Hello, world!";
-    ///     let cursor = tokio::io::Cursor::new(data);
-    ///     let bar = FileTransferProgressBar::new_upload();
-    ///     bar.set_length(data.len() as u64);
-    ///
-    ///     let mut reader_with_progress = bar.wrap_async_read(cursor);
-    ///     let mut buffer = Vec::new();
-    ///     reader_with_progress.read_to_end(&mut buffer).await?;
-    ///
-    ///     bar.finish();
-    ///     Ok(())
-    /// }
-    /// ```
     pub fn wrap_async_read<R: AsyncRead + Unpin>(&self, read: R) -> impl AsyncRead + Unpin {
         self.inner.wrap_async_read(read)
     }
@@ -145,18 +92,6 @@ impl FileTransferProgressBar {
     /// (e.g., "Upload completed" or "Download completed").
     ///
     /// This consumes the `FileTransferProgressBar` instance.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use axon::ui::file_transfer_progress_bar::FileTransferProgressBar;
-    ///
-    /// let bar = FileTransferProgressBar::new_download();
-    /// bar.set_length(500);
-    /// // Simulate some progress
-    /// bar.inner.inc(200);
-    /// bar.finish();
-    /// ```
     pub fn finish(self) {
         let msg = match self.direction {
             Direction::Upload => "Upload completed",

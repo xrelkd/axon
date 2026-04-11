@@ -52,43 +52,6 @@ pub const DEFAULT_SSH_PORT: u16 = 22;
 /// establishing the port forwarding tunnel. These errors are reported via
 /// the `ExitStatus::Error` variant of the `sigfinn` task. The specific
 /// error type returned is `crate::cli::Error`.
-///
-/// # Examples
-///
-/// ```no_run
-/// use std::net::SocketAddr;
-/// use std::sync::Arc;
-/// use k8s_openapi::api::core::v1::Pod;
-/// use kube::{Api, Client};
-/// use sigfinn::Handle;
-/// use tokio::sync::oneshot;
-/// use crate::cli::ssh::internal::setup_port_forwarding; // Assuming this is the correct path
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let client = Client::try_default().await?;
-///     let api: Api<Pod> = Api::namespaced(client, "default");
-///     let pod_name = "my-ssh-pod".to_string();
-///     let remote_port = 22;
-///     let sigfinn_handle = sigfinn::Handle::new();
-///
-///     let receiver = setup_port_forwarding(api, pod_name, remote_port, &sigfinn_handle);
-///
-///     // Wait for the port forwarder to be ready and get the local address
-///     let local_addr = receiver.await?;
-///     println!("SSH port forwarding established on: {}", local_addr);
-///
-///     // In a real application, you would now connect to `local_addr` for SSH.
-///     // For demonstration, we'll just simulate some work and then shut down.
-///     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-///
-///     println!("Shutting down port forwarder...");
-///     sigfinn_handle.shutdown();
-///     sigfinn_handle.join().await;
-///
-///     Ok(())
-/// }
-/// ```
 pub fn setup_port_forwarding(
     api: Api<Pod>,
     pod_name: impl Into<String>,

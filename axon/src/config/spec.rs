@@ -32,31 +32,6 @@ use crate::{
 /// - `command`: The command to execute inside the container.
 /// - `args`: Additional arguments to pass to the command.
 /// - `interactive_shell`: The command to use for an interactive shell session.
-///
-/// # Examples
-///
-/// ```rust
-/// use std::net::IpAddr;
-/// use axon::config::{ImagePullPolicy, PortMapping, Spec};
-///
-/// let spec = Spec {
-///     name: "my-custom-container".to_string(),
-///     image: "ubuntu:latest".to_string(),
-///     image_pull_policy: ImagePullPolicy::IfNotPresent,
-///     port_mappings: vec![PortMapping {
-///         container_port: 80,
-///         local_port: 8080,
-///         address: "127.0.0.1".parse::<IpAddr>().unwrap(),
-///     }],
-///     command: vec!["bash".to_string()],
-///     args: vec!["-c".to_string(), "echo Hello World!".to_string()],
-///     interactive_shell: vec!["/bin/bash".to_string()],
-/// };
-///
-/// assert_eq!(spec.name, "my-custom-container");
-/// assert_eq!(spec.image, "ubuntu:latest");
-/// assert_eq!(spec.command, vec!["bash".to_string()]);
-/// ```
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Spec {
