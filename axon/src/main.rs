@@ -15,7 +15,6 @@ mod ui;
 /// utilizing the `shadow-rs` crate to embed details such as the
 /// build version, commit hash, and build date.
 mod shadow {
-    #![allow(clippy::needless_raw_string_hashes)]
     use shadow_rs::shadow;
     shadow!(build);
 
