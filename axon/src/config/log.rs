@@ -50,20 +50,6 @@ impl Default for LogConfig {
     ///
     /// By default, logs are set to `INFO` level, emitted to `journald` and
     /// `stdout`, but not `stderr` or a file.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use tracing::Level;
-    /// use axon::log::LogConfig;
-    ///
-    /// let default_config = LogConfig::default();
-    /// assert_eq!(default_config.level, Level::INFO);
-    /// assert!(default_config.emit_journald);
-    /// assert!(default_config.emit_stdout);
-    /// assert!(!default_config.emit_stderr);
-    /// assert!(default_config.file_path.is_none());
-    /// ```
     fn default() -> Self {
         Self {
             file_path: Self::default_file_path(),
@@ -113,29 +99,6 @@ impl LogConfig {
     /// This method panics if called more than once in the same application
     /// lifetime, as `tracing_subscriber::util::SubscriberInitExt::init()`
     /// will panic if a global subscriber is already set.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use tracing::Level;
-    /// use axon::log::LogConfig;
-    ///
-    /// // Create a configuration to log INFO level messages to stdout.
-    /// let config = LogConfig {
-    ///     level: Level::INFO,
-    ///     emit_stdout: true,
-    ///     ..Default::default()
-    /// };
-    ///
-    /// // Initialize the logger.
-    /// // Note: In a real application, you'd typically call this once at startup.
-    /// // For testing, you might need to ensure no other subscriber is initialized.
-    /// // config.registry();
-    ///
-    /// // Now you can use tracing macros:
-    /// // tracing::info!("This is an info message.");
-    /// // tracing::debug!("This debug message might not appear depending on the level.");
-    /// ```
     pub fn registry(&self) {
         let Self { emit_journald, file_path, emit_stdout, emit_stderr, level: log_level } = self;
 
@@ -191,32 +154,6 @@ impl LogDriver {
     ///   appending or creation.
     /// - For `LogDriver::Journald`, `tracing_journald::layer()` fails to
     ///   initialize the layer.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use std::path::PathBuf;
-    /// use tracing_subscriber::{
-    ///     Layer, layer::SubscriberExt, registry::LookupSpan, util::SubscriberInitExt,
-    /// };
-    /// use axon::config::log::{LogDriver, LogConfig};
-    ///
-    /// // Example of creating a layer for stdout:
-    /// let stdout_layer = LogDriver::Stdout.layer();
-    /// assert!(stdout_layer.is_some());
-    ///
-    /// // Example of creating a layer for a file (might fail if path is invalid or permissions issue):
-    /// let file_path = PathBuf::from("/tmp/my_app_test.log");
-    /// let file_layer = LogDriver::File(file_path.clone()).layer();
-    /// // In a real scenario, you would check file_layer.is_some() and handle potential errors.
-    ///
-    /// // You can then use these layers to initialize a subscriber:
-    /// // tracing_subscriber::registry()
-    /// //     .with(stdout_layer)
-    /// //     .init();
-    /// // tracing::info!("Logs are now going to stdout!");
-    /// std::fs::remove_file(file_path).ok(); // Clean up test file
-    /// ```
     #[expect(
         clippy::type_repetition_in_bounds,
         reason = "Trait bounds require both Subscriber and LookupSpan for tracing-subscriber \

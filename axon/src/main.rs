@@ -95,19 +95,6 @@ pub static PROJECT_CONFIG_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
 /// A `Vec<PathBuf>` containing potential fallback configuration directory
 /// paths. Returns an empty vector if `directories::UserDirs::new()` fails to
 /// retrieve user directories.
-///
-/// # Examples
-/// ```rust
-/// use std::path::PathBuf;
-/// use axon::fallback_project_config_directories;
-///
-/// let fallback_dirs = fallback_project_config_directories();
-/// // On a Linux system, this might produce paths like:
-/// // - /home/user/.config/axon
-/// // - /home/user/.axon
-/// // On other OS, the paths would conform to their respective conventions.
-/// assert!(fallback_dirs.iter().any(|p| p.ends_with(".config/axon") || p.ends_with(".axon")));
-/// ```
 #[must_use]
 pub fn fallback_project_config_directories() -> Vec<PathBuf> {
     let Some(user_dirs) = directories::UserDirs::new() else {
