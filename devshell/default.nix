@@ -37,7 +37,7 @@ pkgs.mkShell {
     buf
     hclfmt
     nixfmt
-    nodePackages.prettier
+    prettier
     shfmt
     taplo
     treefmt
