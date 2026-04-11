@@ -32,6 +32,8 @@ pkgs.mkShell {
 
     tokei
 
+    typos
+
     jq
 
     buf
