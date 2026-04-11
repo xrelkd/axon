@@ -21,3 +21,9 @@ result
 dist/
 
 .aider*
+
+# cargo config
+.cargo/
+
+# package outputs
+dist/
