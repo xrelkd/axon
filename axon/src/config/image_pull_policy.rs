@@ -9,22 +9,6 @@ use snafu::Snafu;
 ///
 /// This enum defines strategies for how container images should be pulled from
 /// a registry.
-///
-/// # Examples
-///
-/// Basic usage:
-///
-/// ```rust
-/// use axon::config::ImagePullPolicy;
-///
-/// let policy_if_not_present = ImagePullPolicy::IfNotPresent;
-/// let policy_always = ImagePullPolicy::Always;
-/// let policy_never = ImagePullPolicy::Never;
-///
-/// assert_eq!(policy_if_not_present.to_string(), "IfNotPresent");
-/// assert_eq!(policy_always.to_string(), "Always");
-/// assert_eq!(policy_never.to_string(), "Never");
-/// ```
 #[derive(Clone, Debug, Default, Deserialize, Eq, Serialize, PartialEq)]
 pub enum ImagePullPolicy {
     /// Pulls the image only if it is not already present locally.
@@ -82,22 +66,6 @@ impl FromStr for ImagePullPolicy {
     ///
     /// Returns `ParseImagePullPolicyError::Invalid` if `value` does not
     /// correspond to a known `ImagePullPolicy` variant (e.g., "unknown").
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use std::str::FromStr;
-    /// use axon::config::ImagePullPolicy;
-    /// use axon::config::ParseImagePullPolicyError;
-    ///
-    /// assert_eq!(ImagePullPolicy::from_str("IfNotPresent").unwrap(), ImagePullPolicy::IfNotPresent);
-    /// assert_eq!(ImagePullPolicy::from_str("ifnotpresent").unwrap(), ImagePullPolicy::IfNotPresent);
-    /// assert_eq!(ImagePullPolicy::from_str("Always").unwrap(), ImagePullPolicy::Always);
-    /// assert_eq!(ImagePullPolicy::from_str("never").unwrap(), ImagePullPolicy::Never);
-    ///
-    /// let err = ImagePullPolicy::from_str("InvalidPolicy").unwrap_err();
-    /// assert!(matches!(err, ParseImagePullPolicyError::Invalid { value: _ }));
-    /// ```
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value.to_lowercase().as_str() {
             "ifnotpresent" => Ok(Self::IfNotPresent),

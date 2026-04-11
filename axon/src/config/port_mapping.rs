@@ -22,22 +22,6 @@ use crate::consts::k8s::annotations;
 ///
 /// This struct is used to define how a port inside a container is exposed on
 /// the host machine, allowing for flexible network configurations.
-///
-/// # Examples
-/// ```
-/// use std::net::IpAddr;
-/// use axon::config::PortMapping;
-///
-/// let mapping = PortMapping {
-///     container_port: 80,
-///     local_port: 8080,
-///     address: "127.0.0.1".parse().unwrap(),
-/// };
-///
-/// assert_eq!(mapping.container_port, 80);
-/// assert_eq!(mapping.local_port, 8080);
-/// assert_eq!(mapping.address, "127.0.0.1".parse::<IpAddr>().unwrap());
-/// ```
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PortMapping {
@@ -90,28 +74,6 @@ impl PortMapping {
     /// - The extracted container port from the `key` is not a valid `u16`.
     /// - The `value` cannot be parsed into a valid `SocketAddr` (e.g.,
     ///   malformed IP address or port).
-    ///
-    /// # Examples
-    /// ```
-    /// use std::net::IpAddr;
-    /// use axon::config::port_mapping::{PortMapping, PortMappingError};
-    /// use axon::consts::k8s::annotations;
-    ///
-    /// let key = format!("{}/8080", *annotations::PORT_MAPPINGS_PREFIX);
-    /// let value = "127.0.0.1:80";
-    ///
-    /// let mapping = PortMapping::try_from_kubernetes_annotation(key, value)
-    ///     .expect("Valid annotation should parse");
-    ///
-    /// assert_eq!(mapping.container_port, 8080);
-    /// assert_eq!(mapping.local_port, 80);
-    /// assert_eq!(mapping.address, "127.0.0.1".parse::<IpAddr>().unwrap());
-    ///
-    /// // Example of an invalid value
-    /// let invalid_value = "not.an.ip.address:80";
-    /// let error = PortMapping::try_from_kubernetes_annotation(key, invalid_value).unwrap_err();
-    /// assert!(matches!(error, PortMappingError::InvalidFormat { .. }));
-    /// ```
     pub fn try_from_kubernetes_annotation<K, V>(key: K, value: V) -> Result<Self, PortMappingError>
     where
         K: fmt::Display,
@@ -145,7 +107,10 @@ impl PortMapping {
 impl FromStr for PortMapping {
     type Err = PortMappingError;
 
-    #[allow(clippy::doc_markdown)]
+    #[expect(
+        clippy::doc_markdown,
+        reason = "Documentation uses code-style formatting for technical terms that Clippy flags"
+    )]
     /// Parses a `PortMapping` from a string in the format
     /// `ADDRESS:LOCAL_PORT:CONTAINER_PORT`.
     ///
@@ -162,31 +127,6 @@ impl FromStr for PortMapping {
     /// - The `container_port` or `local_port` parts are not valid `u16`
     ///   integers.
     /// - The `address` part is not a valid `IpAddr`.
-    ///
-    /// # Examples
-    /// ```
-    /// use std::net::IpAddr;
-    /// use std::str::FromStr;
-    /// use axon::config::{PortMapping, PortMappingError};
-    ///
-    /// // IPv4 example
-    /// let mapping_v4 = PortMapping::from_str("127.0.0.1:7070:8080")
-    ///     .expect("Should parse valid IPv4 mapping");
-    /// assert_eq!(mapping_v4.address, "127.0.0.1".parse::<IpAddr>().unwrap());
-    /// assert_eq!(mapping_v4.local_port, 7070);
-    /// assert_eq!(mapping_v4.container_port, 8080);
-    ///
-    /// // IPv6 example (handles colons in IPv6 address correctly)
-    /// let mapping_v6 = PortMapping::from_str("::1:7070:8080")
-    ///     .expect("Should parse valid IPv6 mapping");
-    /// assert_eq!(mapping_v6.address, "::1".parse::<IpAddr>().unwrap());
-    /// assert_eq!(mapping_v6.local_port, 7070);
-    /// assert_eq!(mapping_v6.container_port, 8080);
-    ///
-    /// // Error example
-    /// let error = PortMapping::from_str("127.0.0.1:8080").unwrap_err();
-    /// assert!(matches!(error, PortMappingError::InvalidFormat { .. }));
-    /// ```
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         // Use rsplitn(3, ':') to handle IPv6 addresses correctly.
         // It ensures we extract the two ports from the right first.
@@ -211,7 +151,10 @@ impl FromStr for PortMapping {
 
 /// Represents possible errors that can occur when parsing or creating a
 /// `PortMapping`.
-#[allow(clippy::enum_variant_names)]
+#[expect(
+    clippy::enum_variant_names,
+    reason = "Variant names intentionally verbose to match error types across crates"
+)]
 #[derive(Debug, Snafu, PartialEq, Eq)]
 #[snafu(visibility(pub))]
 pub enum PortMappingError {

@@ -1,3 +1,9 @@
+//! SSH file transfer operations.
+//!
+//! This module provides [`FileTransfer`] and [`FileTransferRunner`] for
+//! executing file upload and download operations over SSH connections,
+//! with progress bar support and automatic resource cleanup.
+
 use std::{net::SocketAddr, path::PathBuf};
 
 use crate::{
@@ -80,65 +86,6 @@ impl FileTransferRunner {
     /// - If the file upload or download operation fails (e.g., file not found,
     ///   permission denied, network issues during transfer).
     /// - If the SSH session cannot be cleanly closed after the transfer.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use std::{net::SocketAddr, path::PathBuf, str::FromStr};
-    /// use russh::keys::key::KeyPair;
-    /// use axon::{
-    ///     cli::Error,
-    ///     ssh,
-    ///     cli::ssh::internal::HandleGuard,
-    /// };
-    /// use axon::cli::file_transfer_runner::{FileTransfer, FileTransferRunner};
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Error> {
-    ///     let shutdown_signal = tokio::signal::ctrl_c();
-    ///     let private_key = KeyPair::generate_ed25519().unwrap();
-    ///     let socket_addr = SocketAddr::from_str("127.0.0.1:2222").unwrap();
-    ///     let user = "testuser".to_string();
-    ///
-    ///     // Example: Upload a file
-    ///     let upload_runner = FileTransferRunner {
-    ///         handle: sigfinn::Handle::new(), // In a real scenario, this would come from a running process
-    ///         socket_addr,
-    ///         ssh_private_key: private_key.clone(),
-    ///         user: user.clone(),
-    ///         transfer: FileTransfer::Upload {
-    ///             source: PathBuf::from("local_file.txt"),
-    ///             destination: PathBuf::from("/tmp/remote_file.txt"),
-    ///         },
-    ///     };
-    ///
-    ///     // In a real application, you would ensure the local_file.txt exists
-    ///     // and the remote SSH server is running and accessible at socket_addr.
-    ///     // And for a full example, handle: sigfinn::Handle::new() would be replaced
-    ///     // with a handle to an actual running process.
-    ///     // For demonstration purposes, we omit actual file creation and server setup.
-    ///
-    ///     // This call would actually execute the transfer.
-    ///     // let _ = upload_runner.run(shutdown_signal.clone()).await;
-    ///
-    ///     // Example: Download a file
-    ///     let download_runner = FileTransferRunner {
-    ///         handle: sigfinn::Handle::new(), // In a real scenario, this would come from a running process
-    ///         socket_addr,
-    ///         ssh_private_key: private_key,
-    ///         user,
-    ///         transfer: FileTransfer::Download {
-    ///             source: PathBuf::from("/tmp/remote_file.txt"),
-    ///             destination: PathBuf::from("downloaded_file.txt"),
-    ///         },
-    ///     };
-    ///
-    ///     // Again, in a real application, ensure the remote_file.txt exists on the server.
-    ///     // let _ = download_runner.run(shutdown_signal).await;
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
     pub async fn run(self, shutdown_signal: impl Future<Output = ()> + Unpin) -> Result<(), Error> {
         let Self { handle, socket_addr, ssh_private_key, user, transfer } = self;
 

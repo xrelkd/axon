@@ -1,0 +1,30 @@
+[default]
+extend-ignore-identifiers-re = [
+  "[a-zA-Z0-9+/]{50,}",
+  # Rust module paths
+  "^crate::",
+  "^use crate",
+  "^pub(crate)",
+]
+
+[default.extend-words]
+crate  = "crate"
+Crate  = "Crate"
+de     = "de"
+ser    = "ser"
+flate  = "flate"
+flate2 = "flate2"
+
+AKS = "AKS"
+aks = "aks"
+AWS = "AWS"
+aws = "aws"
+EKS = "EKS"
+eks = "eks"
+GKE = "GKE"
+gke = "gke"
+LKE = "LKE"
+lke = "lke"
+
+[files]
+extend-exclude = ["target/", "Cargo.lock", "flake.lock"]

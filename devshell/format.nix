@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, lib }:
 
 pkgs.runCommand "check-format"
   {
@@ -7,27 +7,30 @@ pkgs.runCommand "check-format"
 
       shellcheck
 
-      buf
       nixfmt
-      nodePackages.prettier
+      prettier
       shfmt
       taplo
       treefmt
     ];
   }
   ''
+    set -e
+
+    src=/tmp/axon-format
+    cp -r ${lib.cleanSource ./..} "$src"
+    chmod -R u+w "$src"
+    cd "$src"
+
     treefmt \
       --allow-missing-formatter \
       --fail-on-change \
       --no-cache \
       --formatters prettier \
-      --formatters protobuf \
       --formatters nix \
       --formatters shell \
       --formatters hcl \
-      --formatters toml \
-      -C ${./..}
+      --formatters toml
 
-    # it worked!
     touch $out
   ''

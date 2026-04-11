@@ -79,13 +79,11 @@ pub trait PodListExt {
 
         tokio::task::spawn_blocking(move || {
             let (tx_item, rx_item): (SkimItemSender, SkimItemReceiver) = unbounded();
-            for item in items {
-                drop(tx_item.send(item));
-            }
+            drop(tx_item.send(items));
             drop(tx_item);
 
             let options = generate_skim_options();
-            if let Some(out) = Skim::run_with(&options, Some(rx_item)) {
+            if let Ok(out) = Skim::run_with(options, Some(rx_item)) {
                 if out.is_abort {
                     return Vec::new();
                 }
@@ -112,6 +110,10 @@ impl PodListExt for ObjectList<Pod> {
 /// A wrapper struct for `k8s_openapi::api::core::v1::Pod` that implements the
 /// `SkimItem` trait, making `Pod` objects compatible with the `skim` fuzzy
 /// finder.
+///
+/// This struct adapts a Kubernetes `Pod` to display key information (name,
+/// image, phase, namespace, node name) in the fuzzy finder interface and
+/// returns the pod name when selected.
 pub struct PodSkimItem(Pod);
 
 /// Implements the `From` trait to convert a `k8s_openapi::api::core::v1::Pod`
@@ -123,35 +125,9 @@ impl From<Pod> for PodSkimItem {
 /// Implements the `SkimItem` trait for `PodSkimItem`, defining how a `Pod` is
 /// displayed and interacted with within the `skim` fuzzy finder.
 impl SkimItem for PodSkimItem {
-    /// Returns the primary text used by `skim` for matching and display.
-    /// This is typically the pod's name.
-    ///
-    /// # Returns
-    /// A `Cow<'_, str>` representing the pod's name, or an empty string if the
-    /// name is not set.
-    fn text(&self) -> Cow<'_, str> { self.0.metadata.name.clone().unwrap_or_default().into() }
+    fn text(&self) -> Cow<'_, str> { pod_column(&self.0).join(COLUMN_SEPARATOR).into() }
 
-    /// Returns the output string when the item is selected.
-    /// This is typically the pod's name, used for retrieving the selected
-    /// item's identifier.
-    ///
-    /// # Returns
-    /// A `Cow<'_, str>` representing the pod's name, or an empty string if the
-    /// name is not set.
     fn output(&self) -> Cow<'_, str> { self.0.metadata.name.clone().unwrap_or_default().into() }
-
-    /// Defines how the `PodSkimItem` is displayed in the `skim` interface,
-    /// arranging pod information into columns.
-    ///
-    /// # Arguments
-    /// * `_context` - The display context provided by `skim`, currently unused.
-    ///
-    /// # Returns
-    /// An `AnsiString` representing the formatted pod information with ANSI
-    /// escape codes for potential coloring or styling.
-    fn display<'a>(&'a self, _context: skim::DisplayContext<'a>) -> skim::AnsiString<'a> {
-        skim::AnsiString::from(pod_column(&self.0).join(COLUMN_SEPARATOR))
-    }
 }
 
 /// Extracts key information from a Kubernetes `Pod` object and formats it into
@@ -193,8 +169,8 @@ fn pod_column(pod: &Pod) -> [String; 5] {
 /// A `SkimOptions` struct configured for pod selection.
 fn generate_skim_options() -> SkimOptions {
     SkimOptionsBuilder::default()
-        .height("100%".to_string())
+        .height("100%")
         .multi(false)
         .build()
-        .expect("Skim options build failed")
+        .expect("Failed to build SkimOptions")
 }

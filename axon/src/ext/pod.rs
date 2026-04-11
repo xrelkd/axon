@@ -1,3 +1,15 @@
+//! Pod extension trait for Axon-specific configurations.
+//!
+//! This module provides [`PodExt`], an extension trait for Kubernetes `Pod`
+//! objects that extracts Axon-specific configurations such as interactive
+//! shell commands, port mappings, and service ports from pod annotations.
+
+//! Pod extension trait for Axon-specific configurations.
+//!
+//! This module provides [`PodExt`], an extension trait for Kubernetes `Pod`
+//! objects that extracts Axon-specific configurations such as interactive
+//! shell commands, port mappings, and service ports from pod annotations.
+
 use k8s_openapi::{Metadata, api::core::v1::Pod};
 
 use crate::{

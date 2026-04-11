@@ -34,7 +34,7 @@ impl ServicePorts {
     ///
     /// A `ServicePorts` instance with `ssh`, `http`, and `https` fields set to
     /// their common defaults.
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "Kept for future features and public API stability")]
     pub const fn common() -> Self { Self { ssh: Some(22), http: Some(80), https: Some(443) } }
 
     /// Aggregates multiple Kubernetes annotations into a single `ServicePorts`

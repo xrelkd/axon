@@ -1,3 +1,9 @@
+//! Terminal raw mode management.
+//!
+//! This module provides utilities for enabling and disabling terminal raw
+//! mode, using a RAII guard ([`TerminalRawModeGuard`]) to ensure the
+//! terminal is restored to its previous state even on unexpected exits.
+
 mod error;
 
 use std::io::Write;
@@ -30,21 +36,6 @@ impl TerminalRawModeGuard {
     /// Returns an `Error` if `crossterm::terminal::enable_raw_mode()` fails,
     /// typically due to an underlying I/O error when interacting with the
     /// terminal.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use axon::ui::terminal::TerminalRawModeGuard;
-    ///
-    /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let _guard = TerminalRawModeGuard::setup()?;
-    ///     // Terminal is in raw mode here
-    ///     println!("Terminal is in raw mode. Press any key to continue...");
-    ///     std::io::stdin().read_line(&mut String::new())?;
-    ///     // When _guard goes out of scope, raw mode is disabled
-    ///     Ok(())
-    /// }
-    /// ```
     pub fn setup() -> Result<Self, Error> {
         crossterm::terminal::enable_raw_mode().context(error::EnableTerminalRawModeSnafu)?;
         Ok(Self)

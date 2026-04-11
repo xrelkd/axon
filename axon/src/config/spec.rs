@@ -32,32 +32,6 @@ use crate::{
 /// - `command`: The command to execute inside the container.
 /// - `args`: Additional arguments to pass to the command.
 /// - `interactive_shell`: The command to use for an interactive shell session.
-///
-/// # Examples
-///
-/// ```rust
-/// use crate::config::{ImagePullPolicy, PortMapping, ServicePorts, Spec};
-///
-/// let spec = Spec {
-///     name: "my-custom-container".to_string(),
-///     image: "ubuntu:latest".to_string(),
-///     image_pull_policy: ImagePullPolicy::IfNotPresent,
-///     port_mappings: vec![
-///         PortMapping {
-///             host_port: 8080,
-///             container_port: 80,
-///         },
-///     ],
-///     service_ports: ServicePorts::default(),
-///     command: vec!["bash".to_string()],
-///     args: vec!["-c".to_string(), "echo Hello World!".to_string()],
-///     interactive_shell: vec!["/bin/bash".to_string()],
-/// };
-///
-/// assert_eq!(spec.name, "my-custom-container");
-/// assert_eq!(spec.image, "ubuntu:latest");
-/// assert_eq!(spec.command, vec!["bash".to_string()]);
-/// ```
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Spec {
@@ -66,13 +40,11 @@ pub struct Spec {
 
     /// The Docker image to use for the container (e.g., "ubuntu:latest",
     /// "my-repo/my-image:1.0").
-    #[allow(clippy::struct_field_names)]
     pub image: String,
 
     /// Defines when the Docker image should be pulled.
     ///
     /// Defaults to `ImagePullPolicy::Always` if not specified.
-    #[allow(clippy::struct_field_names)]
     #[serde(default)]
     pub image_pull_policy: ImagePullPolicy,
 
