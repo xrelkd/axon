@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v18
+        uses: DeterminateSystems/nix-installer-action@v22
 
       - name: Build release assets
         if: startsWith(github.ref, 'refs/tags/')
