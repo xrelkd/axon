@@ -28,8 +28,8 @@ serde_json = "1"
 serde_with = "3"
 serde_yaml = "0.9"
 
-k8s-openapi = { version = "0.27", features = ["latest"] }
-kube        = { version = "3", features = ["runtime", "ws"] }
+k8s-openapi = { version = "0.28", features = ["latest"] }
+kube        = { version = "4", features = ["runtime", "ws"] }
 
 futures = { version = "0.3", features = ["alloc"] }
 sigfinn = "0.2"
