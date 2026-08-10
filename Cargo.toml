@@ -46,7 +46,7 @@ tokio-util = "0.7"
 
 clap          = { version = "4", features = ["color", "derive", "env"] }
 clap_complete = "4"
-comfy-table   = { version = "7" }
+comfy-table   = { version = "8" }
 crossterm     = "0.29"
 directories   = "6"
 indicatif     = { version = "0.18", features = ["tokio"] }
