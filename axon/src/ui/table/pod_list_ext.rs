@@ -92,7 +92,7 @@ impl PodListExt for ObjectList<Pod> {
     fn render_table(&self) -> String {
         let rows = self.items.iter().map(pod_column).collect::<Vec<_>>();
         comfy_table::Table::new()
-            .load_preset(comfy_table::presets::NOTHING)
+            .load_style(comfy_table::presets::NOTHING)
             .set_content_arrangement(comfy_table::ContentArrangement::Dynamic)
             .set_header(vec!["NAME", "IMAGE", "STATUS", "NAMESPACE", "NODE"])
             .add_rows(rows)
