@@ -7,7 +7,7 @@ use std::{path::Path, sync::Arc, time::Duration};
 use futures::{FutureExt, future};
 use russh::{
     ChannelMsg, Disconnect, client,
-    keys::{PrivateKey, PublicKey, key::PrivateKeyWithHashAlg},
+    keys::{PrivateKey, PublicKeyOrCertificate, key::PrivateKeyWithHashAlg},
 };
 use russh_sftp::{client::SftpSession, protocol::OpenFlags};
 use snafu::{IntoError, ResultExt};
@@ -45,7 +45,7 @@ impl client::Handler for Client {
     /// `Ok(true)` always, indicating the server key is accepted.
     fn check_server_key(
         &mut self,
-        _server_public_key: &PublicKey,
+        _server_public_key: &PublicKeyOrCertificate,
     ) -> impl Future<Output = Result<bool, Self::Error>> + Send {
         std::future::ready(Ok(true))
     }
