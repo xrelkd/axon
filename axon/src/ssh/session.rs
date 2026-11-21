@@ -43,11 +43,11 @@ impl client::Handler for Client {
     /// # Returns
     ///
     /// `Ok(true)` always, indicating the server key is accepted.
-    async fn check_server_key(
+    fn check_server_key(
         &mut self,
         _server_public_key: &PublicKey,
-    ) -> Result<bool, Self::Error> {
-        Ok(true)
+    ) -> impl Future<Output = Result<bool, Self::Error>> + Send {
+        std::future::ready(Ok(true))
     }
 }
 

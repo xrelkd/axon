@@ -136,7 +136,8 @@ impl FromStr for PortMapping {
             return InvalidFormatSnafu { input }.fail();
         }
 
-        // parts[0] is container_port, parts[1] is local_port, parts[2] is address
+        // parts[0] is container_port, parts[1] is local_port, parts[2] is
+        // address
         let container_port =
             parts[0].parse::<u16>().context(InvalidPortSnafu { value: parts[0] })?;
 
@@ -209,7 +210,8 @@ mod tests {
 
     #[test]
     fn test_parse_ipv6_mapping() {
-        // rsplitn correctly treats "::1" as the address even with internal colons
+        // rsplitn correctly treats "::1" as the address even with internal
+        // colons
         let input = "::1:7070:8080";
         let result: PortMapping = input.parse().expect("Should parse valid IPv6");
 
@@ -296,7 +298,8 @@ mod tests {
     fn test_invalid_socket_format() {
         let key = format!("{}/80", *annotations::PORT_MAPPINGS_PREFIX);
 
-        // Missing brackets for IPv6 or missing port will fail SocketAddr parsing
+        // Missing brackets for IPv6 or missing port will fail SocketAddr
+        // parsing
         let value = "2001:db8::1:80";
         let result = PortMapping::try_from_kubernetes_annotation(key, value);
 
