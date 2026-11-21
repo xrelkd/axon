@@ -67,7 +67,7 @@ impl SpecExt for Vec<Spec> {
             .collect::<Vec<_>>();
 
         comfy_table::Table::new()
-            .load_preset(comfy_table::presets::NOTHING)
+            .load_style(comfy_table::presets::NOTHING)
             .set_content_arrangement(ContentArrangement::Dynamic)
             .set_header(vec![
                 "NAME",

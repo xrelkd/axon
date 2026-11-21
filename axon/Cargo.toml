@@ -3,7 +3,6 @@ name                   = "axon"
 description            = "A command-line tool designed to simplify your interactions with Kubernetes"
 version.workspace      = true
 authors.workspace      = true
-homepage.workspace     = true
 readme.workspace       = true
 repository.workspace   = true
 license.workspace      = true
@@ -48,8 +47,6 @@ russh      = { workspace = true }
 russh-sftp = { workspace = true }
 
 [build-dependencies]
-k8s-openapi = { workspace = true }
-
 shadow-rs = { workspace = true }
 
 [lints]

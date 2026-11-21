@@ -148,8 +148,7 @@ fn pod_column(pod: &Pod) -> [String; 5] {
         pod.spec
             .as_ref()
             .and_then(|s| s.containers.first())
-            .map(|c| c.image.clone().unwrap_or_default())
-            .unwrap_or_default(),
+            .map_or_default(|c| c.image.clone().unwrap_or_default()),
         pod.status.as_ref().and_then(|s| s.phase.clone()).unwrap_or_else(|| "Unknown".to_string()),
         pod.metadata.namespace.clone().unwrap_or_default(),
         pod.spec.as_ref().and_then(|s| s.node_name.clone()).unwrap_or_default(),
