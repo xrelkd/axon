@@ -90,7 +90,8 @@ impl Configurator {
                 pod_name: pod_name.clone(),
             })?;
 
-        // Wait for the command to complete. The output is ignored for this operation.
+        // Wait for the command to complete. The output is ignored for this
+        // operation.
         let _unused = attached.join().await;
 
         Ok(())

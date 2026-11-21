@@ -372,7 +372,8 @@ where
         let cancel_token = CancellationToken::new();
 
         // 1. Shutdown Watcher Task
-        // Listens for the external signal and triggers the internal cancellation
+        // Listens for the external signal and triggers the internal
+        // cancellation
         let _unused = join_set.spawn({
             let event_sender = event_sender.clone();
             let token_shutdown = cancel_token.clone();
@@ -466,8 +467,8 @@ where
         }
 
         // --- Cleanup Phase ---
-        // Explicitly drop the receiver so tasks sending events fail (if any are still
-        // alive)
+        // Explicitly drop the receiver so tasks sending events fail (if any are
+        // still alive)
         drop(event_receiver);
 
         tracing::info!("Waiting for all active connections to close...");
