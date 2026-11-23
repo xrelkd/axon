@@ -52,7 +52,7 @@ resolve-path  = "0.1"
 semver        = "1"
 shadow-rs     = { version = "2", default-features = false, features = ["build"] }
 shell-escape  = "0.1"
-skim          = { version = "4", default-features = false }
+skim          = { version = "5", default-features = false }
 snafu         = "0.9"
 
 russh      = { version = "0.65", default-features = false, features = ["ring"] }
